@@ -371,14 +371,17 @@ final class AppState: ObservableObject {
         var v = visit(for: countryId)
         v.photos.removeAll { $0.id == photoId }
         v.updatedAt = Date()
-        
+
         // OPTIMIZATION: Manual notification to avoid triggering @Published twice
         objectWillChange.send()
         visits[countryId] = v
-        
+
         do {
             try repository.removePhoto(countryId, photoId: photoId)
             Task {
+                // Delete from cloud subcollection first so the subsequent full sync
+                // doesn't re-download the just-deleted photo.
+                await syncService?.deleteCloudPhoto(countryId: countryId, photoId: photoId)
                 await syncWithCloud(showStatus: false)
             }
         } catch {

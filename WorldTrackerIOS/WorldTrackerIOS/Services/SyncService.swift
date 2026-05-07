@@ -154,13 +154,43 @@ final class SyncService {
         }
             
             #if DEBUG
-            print("✅ Sync complete: \(syncedCount) synced, \(errorCount) errors")
+            print("✅ Metadata sync complete: \(syncedCount) synced, \(errorCount) errors")
             #endif
-            
-            // If there were any errors, throw an aggregate error
+
             if errorCount > 0 {
                 throw SyncError.partialFailure(syncedCount: syncedCount, failedCount: errorCount)
             }
+
+            // Phase 2: Photo sync via subcollection (no 1 MB document size limit).
+            // Errors here are non-fatal — metadata sync already succeeded.
+            // Re-read local state — some visits may have been added by saveToLocal above.
+            let currentLocalVisits = try localRepository.allVisits()
+            let currentLocalById = Dictionary(uniqueKeysWithValues: currentLocalVisits.map { ($0.countryId, $0) })
+
+            for countryId in allCountryIDs {
+                let localPhotos = currentLocalById[countryId]?.photos ?? []
+                do {
+                    let mergedPhotos = try await cloudRepository.syncPhotos(
+                        countryId: countryId, localPhotos: localPhotos
+                    )
+                    if mergedPhotos.count != localPhotos.count,
+                       var localVisit = currentLocalById[countryId] {
+                        localVisit.photos = mergedPhotos
+                        try localRepository.upsert(localVisit)
+                    }
+                } catch let error as FirestoreVisitRepositoryError where error == .offline {
+                    throw error  // propagates to outer catch → .noConnection
+                } catch {
+                    #if DEBUG
+                    print("⚠️ Photo sync failed for \(countryId): \(error)")
+                    #endif
+                    // Non-fatal: metadata sync succeeded; photos will retry on next sync
+                }
+            }
+
+            #if DEBUG
+            print("✅ Photo sync complete")
+            #endif
         } catch {
             // Check if it's a network error
             let nsError = error as NSError
@@ -211,22 +241,31 @@ final class SyncService {
     }
 
     private func pushToCloud(_ visit: Visit) async throws {
-        // Write all visit fields including photos in a single atomic Firestore write.
-        // The old approach called setVisited (which wiped the photos field) then added
-        // photos one-by-one with try?, causing photo loss on any network hiccup.
         try await cloudRepository.setVisit(visit)
     }
 
     private func saveToLocal(_ visit: Visit) throws {
         var merged = visit
-        // If the cloud document has no photos (e.g. written by an older app version before
-        // photo sync was added), fall back to whatever is already on this device so we don't
-        // silently wipe locally-stored photos.
-        if merged.photos.isEmpty {
-            let existing = try? localRepository.visit(for: visit.countryId)
-            merged.photos = existing?.photos ?? []
+        let existing = try? localRepository.visit(for: visit.countryId)
+        if let existing, !existing.photos.isEmpty {
+            // Prefer local photos; photo subcollection sync handles cross-device transfer
+            merged.photos = existing.photos
         }
+        // If no existing local photos, preserve any photos decoded from the legacy "photos"
+        // field (old Firestore format) so the first sync on a new device migrates them.
         try localRepository.upsert(merged)
+    }
+
+    /// Deletes a single photo from the Firestore photos subcollection. Best-effort — errors are logged but not thrown.
+    func deleteCloudPhoto(countryId: String, photoId: UUID) async {
+        guard Auth.auth().currentUser != nil else { return }
+        do {
+            try await cloudRepository.deletePhoto(countryId: countryId, photoId: photoId)
+        } catch {
+            #if DEBUG
+            print("⚠️ Failed to delete cloud photo \(photoId) for \(countryId): \(error)")
+            #endif
+        }
     }
 }
 
