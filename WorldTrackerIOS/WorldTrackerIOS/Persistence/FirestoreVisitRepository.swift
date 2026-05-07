@@ -80,7 +80,7 @@ final class FirestoreVisitRepository {
         )
     }
 
-    /// Writes a full visit snapshot to Firestore, including photos.
+    /// Writes visit metadata to Firestore. Photos are stored separately in the photos subcollection.
     func setVisit(_ visit: Visit) async throws {
         let userID = try requireUserID()
         let ref = db.collection("users")
@@ -88,17 +88,13 @@ final class FirestoreVisitRepository {
             .collection("visits")
             .document(visit.countryId)
 
-        var data: [String: Any] = [
+        let data: [String: Any] = [
             "isVisited": visit.isVisited,
             "wantToVisit": visit.wantToVisit,
             "visitedDate": visit.visitedDate as Any,
             "notes": visit.notes,
             "updatedAt": Timestamp(date: visit.updatedAt)
         ]
-
-        if !visit.photos.isEmpty {
-            data["photos"] = try encodePhotosToBase64(visit.photos)
-        }
 
         try await setData(data, for: ref)
     }
@@ -427,8 +423,63 @@ final class FirestoreVisitRepository {
         return .unknown(error)
     }
     
-    // MARK: - Photo encoding
-    
+    // MARK: - Photo Subcollection
+
+    /// Syncs photos for a country using the photos subcollection.
+    /// Uploads local-only photos to cloud and returns the union of local + cloud-only photos.
+    func syncPhotos(countryId: String, localPhotos: [VisitPhoto]) async throws -> [VisitPhoto] {
+        let userID = try requireUserID()
+        let ref = photosCollection(userID: userID, countryId: countryId)
+        let snapshot = try await getDocuments(from: ref)
+        let cloudPhotos = snapshot.documents.compactMap { photoFromDocument($0) }
+
+        let cloudIds = Set(cloudPhotos.map { $0.id })
+        let localIds  = Set(localPhotos.map { $0.id })
+
+        for photo in localPhotos where !cloudIds.contains(photo.id) {
+            try await setData(photoDocument(photo), for: ref.document(photo.id.uuidString))
+        }
+
+        return localPhotos + cloudPhotos.filter { !localIds.contains($0.id) }
+    }
+
+    func deletePhoto(countryId: String, photoId: UUID) async throws {
+        let userID = try requireUserID()
+        try await deleteDocument(
+            photosCollection(userID: userID, countryId: countryId).document(photoId.uuidString)
+        )
+    }
+
+    private func photosCollection(userID: String, countryId: String) -> CollectionReference {
+        db.collection("users")
+            .document(userID)
+            .collection("visits")
+            .document(countryId)
+            .collection("photos")
+    }
+
+    private func photoDocument(_ photo: VisitPhoto) -> [String: Any] {
+        [
+            "imageData": photo.imageData.base64EncodedString(),
+            "caption": photo.caption,
+            "createdAt": Timestamp(date: photo.createdAt)
+        ]
+    }
+
+    private func photoFromDocument(_ doc: QueryDocumentSnapshot) -> VisitPhoto? {
+        let data = doc.data()
+        guard let s = data["imageData"] as? String,
+              let imageData = Data(base64Encoded: s) else { return nil }
+        return VisitPhoto(
+            id: UUID(uuidString: doc.documentID) ?? UUID(),
+            imageData: imageData,
+            caption: data["caption"] as? String ?? "",
+            createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+        )
+    }
+
+    // MARK: - Photo encoding (legacy: used by addPhoto/removePhoto/updatePhotoCaption)
+
     private func encodePhotosToBase64(_ photos: [VisitPhoto]) throws -> String {
         let jsonData = try JSONEncoder().encode(photos)
         return jsonData.base64EncodedString()
