@@ -8,6 +8,10 @@
 import Foundation
 import Combine
 import FirebaseAuth
+import GoogleSignIn
+import AuthenticationServices
+import CryptoKit
+import UIKit
 
 @MainActor
 final class AuthService: ObservableObject {
@@ -143,6 +147,94 @@ final class AuthService: ObservableObject {
         try Auth.auth().signOut()
     }
 
+    // MARK: - Google Sign-In
+
+    func signInWithGoogle() async throws {
+        guard let rootVC = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first(where: { $0.isKeyWindow })?.rootViewController else {
+            throw SocialAuthError.presentationError
+        }
+
+        let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootVC)
+        guard let idToken = result.user.idToken?.tokenString else {
+            throw SocialAuthError.missingToken
+        }
+
+        let credential = GoogleAuthProvider.credential(
+            withIDToken: idToken,
+            accessToken: result.user.accessToken.tokenString
+        )
+        let authResult = try await Auth.auth().signIn(with: credential)
+
+        if authResult.additionalUserInfo?.isNewUser == true {
+            let profile = UserProfile(
+                userId: authResult.user.uid,
+                email: authResult.user.email ?? "",
+                firstName: result.user.profile?.givenName ?? "",
+                lastName: result.user.profile?.familyName ?? ""
+            )
+            try? await FirestoreUserRepository().createOrUpdateProfile(profile)
+        }
+    }
+
+    // MARK: - Apple Sign-In
+
+    private let appleCoordinator = AppleSignInCoordinator()
+    private var currentNonce: String?
+
+    func signInWithApple() async throws {
+        let nonce = randomNonceString()
+        currentNonce = nonce
+
+        let provider = ASAuthorizationAppleIDProvider()
+        let request = provider.createRequest()
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = sha256(nonce)
+
+        let authorization = try await appleCoordinator.signIn(with: request)
+
+        guard let appleCredential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let tokenData = appleCredential.identityToken,
+              let idToken = String(data: tokenData, encoding: .utf8),
+              let nonce = currentNonce else {
+            throw SocialAuthError.missingToken
+        }
+
+        let credential = OAuthProvider.appleCredential(
+            withIDToken: idToken,
+            rawNonce: nonce,
+            fullName: appleCredential.fullName
+        )
+        let authResult = try await Auth.auth().signIn(with: credential)
+
+        // Apple only provides name and email on the very first sign-in
+        if authResult.additionalUserInfo?.isNewUser == true {
+            let profile = UserProfile(
+                userId: authResult.user.uid,
+                email: appleCredential.email ?? authResult.user.email ?? "",
+                firstName: appleCredential.fullName?.givenName ?? "",
+                lastName: appleCredential.fullName?.familyName ?? ""
+            )
+            try? await FirestoreUserRepository().createOrUpdateProfile(profile)
+        }
+    }
+
+    // MARK: - Nonce helpers (required by Apple Sign-In)
+
+    private func randomNonceString(length: Int = 32) -> String {
+        var randomBytes = [UInt8](repeating: 0, count: length)
+        SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+        let charset = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        return String(randomBytes.map { charset[Int($0) % charset.count] })
+    }
+
+    private func sha256(_ input: String) -> String {
+        let hash = SHA256.hash(data: Data(input.utf8))
+        return hash.map { String(format: "%02x", $0) }.joined()
+    }
+
     /// Reauthenticate the current user with their password
     /// Required by Firebase before sensitive operations like password changes
     func reauthenticate(currentPassword: String) async throws {
@@ -216,13 +308,63 @@ enum AuthState: Equatable, CustomStringConvertible {
     case unknown
     case signedIn
     case signedOut
-    
+
     var description: String {
         switch self {
         case .unknown: return ".unknown"
         case .signedIn: return ".signedIn"
         case .signedOut: return ".signedOut"
         }
+    }
+}
+
+enum SocialAuthError: LocalizedError {
+    case missingToken
+    case presentationError
+
+    var errorDescription: String? {
+        switch self {
+        case .missingToken:       return "Sign-in failed. Please try again."
+        case .presentationError:  return "Could not present the sign-in screen."
+        }
+    }
+}
+
+// MARK: - Apple Sign-In Coordinator
+
+private final class AppleSignInCoordinator: NSObject,
+    ASAuthorizationControllerDelegate,
+    ASAuthorizationControllerPresentationContextProviding
+{
+    private var continuation: CheckedContinuation<ASAuthorization, Error>?
+
+    func signIn(with request: ASAuthorizationAppleIDRequest) async throws -> ASAuthorization {
+        try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            controller.delegate = self
+            controller.presentationContextProvider = self
+            controller.performRequests()
+        }
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow } ?? UIWindow()
+    }
+
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithAuthorization authorization: ASAuthorization) {
+        continuation?.resume(returning: authorization)
+        continuation = nil
+    }
+
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithError error: Error) {
+        continuation?.resume(throwing: error)
+        continuation = nil
     }
 }
 

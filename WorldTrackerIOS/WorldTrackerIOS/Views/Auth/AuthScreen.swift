@@ -18,6 +18,7 @@ struct AuthScreen: View {
     @State private var isCreatingAccount = false
     @State private var errorMessage: String?
     @State private var isSubmitting = false
+    @State private var isSocialSubmitting = false
     @State private var showPassword = false
 
     var body: some View {
@@ -186,10 +187,14 @@ struct AuthScreen: View {
                 VStack(spacing: 12) {
                     // Google
                     Button {
-                        // TODO: Google sign-in
+                        Task { await submitSocial { try await authService.signInWithGoogle() } }
                     } label: {
                         HStack(spacing: 12) {
-                            GoogleLogoView()
+                            if isSocialSubmitting {
+                                ProgressView().tint(.black)
+                            } else {
+                                GoogleLogoView()
+                            }
                             Text("Continue with Google")
                                 .font(.custom("Inter", size: 16))
                                 .fontWeight(.semibold)
@@ -200,25 +205,12 @@ struct AuthScreen: View {
                         .background(Color(hex: "#F5F5F5"))
                         .clipShape(Capsule())
                     }
+                    .disabled(isSocialSubmitting || isSubmitting)
 
-                    // Apple
-                    Button {
-                        // TODO: Apple sign-in
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "apple.logo")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundStyle(.black)
-                            Text("Continue with Apple")
-                                .font(.custom("Inter", size: 16))
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.black)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(Color(hex: "#F5F5F5"))
-                        .clipShape(Capsule())
-                    }
+                    // Apple (requires paid Apple Developer account — hidden until enrolled)
+                    // Button {
+                    //     Task { await submitSocial { try await authService.signInWithApple() } }
+                    // } label: { ... }
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 24)
@@ -258,6 +250,19 @@ struct AuthScreen: View {
             return base && !firstName.isEmpty && !lastName.isEmpty
         }
         return base
+    }
+
+    private func submitSocial(_ action: () async throws -> Void) async {
+        errorMessage = nil
+        isSocialSubmitting = true
+        defer { isSocialSubmitting = false }
+        do {
+            try await action()
+        } catch {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                errorMessage = friendlyErrorMessage(from: error)
+            }
+        }
     }
 
     private func submit() async {

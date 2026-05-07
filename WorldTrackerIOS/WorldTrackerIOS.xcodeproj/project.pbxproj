@@ -10,15 +10,30 @@
 		0424509F2F5EA5D200ECE1D6 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 0424509E2F5EA5D200ECE1D6 /* FirebaseAuth */; };
 		042450A12F5EA5D200ECE1D6 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 042450A02F5EA5D200ECE1D6 /* FirebaseCore */; };
 		042450A32F5EA5D200ECE1D6 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 042450A22F5EA5D200ECE1D6 /* FirebaseFirestore */; };
+		04CB46122FAD28CA00883B87 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 04CB46112FAD28CA00883B87 /* GoogleSignIn */; };
+		04CB46142FAD28CA00883B87 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 04CB46132FAD28CA00883B87 /* GoogleSignInSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		04ACF9D52F4E45E0004448FC /* WorldTrackerIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WorldTrackerIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		04CB460F2FAD286100883B87 /* Exceptions for "WorldTrackerIOS" folder in "WorldTrackerIOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 04ACF9D42F4E45E0004448FC /* WorldTrackerIOS */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		04ACF9D72F4E45E0004448FC /* WorldTrackerIOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				04CB460F2FAD286100883B87 /* Exceptions for "WorldTrackerIOS" folder in "WorldTrackerIOS" target */,
+			);
 			path = WorldTrackerIOS;
 			sourceTree = "<group>";
 		};
@@ -29,7 +44,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				04CB46142FAD28CA00883B87 /* GoogleSignInSwift in Frameworks */,
 				042450A12F5EA5D200ECE1D6 /* FirebaseCore in Frameworks */,
+				04CB46122FAD28CA00883B87 /* GoogleSignIn in Frameworks */,
 				0424509F2F5EA5D200ECE1D6 /* FirebaseAuth in Frameworks */,
 				042450A32F5EA5D200ECE1D6 /* FirebaseFirestore in Frameworks */,
 			);
@@ -77,6 +94,8 @@
 				0424509E2F5EA5D200ECE1D6 /* FirebaseAuth */,
 				042450A02F5EA5D200ECE1D6 /* FirebaseCore */,
 				042450A22F5EA5D200ECE1D6 /* FirebaseFirestore */,
+				04CB46112FAD28CA00883B87 /* GoogleSignIn */,
+				04CB46132FAD28CA00883B87 /* GoogleSignInSwift */,
 			);
 			productName = WorldTrackerIOS;
 			productReference = 04ACF9D52F4E45E0004448FC /* WorldTrackerIOS.app */;
@@ -108,6 +127,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				0424509D2F5EA5D200ECE1D6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				04CB46102FAD28CA00883B87 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 04ACF9D62F4E45E0004448FC /* Products */;
@@ -269,6 +289,7 @@
 				DEVELOPMENT_TEAM = LT76D3X9J2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WorldTrackerIOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "World Tracker";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -303,6 +324,7 @@
 				DEVELOPMENT_TEAM = LT76D3X9J2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WorldTrackerIOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "World Tracker";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -359,6 +381,14 @@
 				minimumVersion = 12.10.0;
 			};
 		};
+		04CB46102FAD28CA00883B87 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -376,6 +406,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0424509D2F5EA5D200ECE1D6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
+		};
+		04CB46112FAD28CA00883B87 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 04CB46102FAD28CA00883B87 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		04CB46132FAD28CA00883B87 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 04CB46102FAD28CA00883B87 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

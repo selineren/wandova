@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import FirebaseCore
 import FirebaseAuth
+import GoogleSignIn
 import CoreText
 
 @main
@@ -82,6 +83,9 @@ struct WorldTrackerIOSApp: App {
                 .environmentObject(authService)
                 .task(id: authService.authState) {
                     await handleAuthStateChange()
+                }
+                .onOpenURL { url in
+                    GIDSignIn.sharedInstance.handle(url)
                 }
         }
         .modelContainer(container)
