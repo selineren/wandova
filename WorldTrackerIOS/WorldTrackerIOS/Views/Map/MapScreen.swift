@@ -366,7 +366,7 @@ struct MapScreen: View {
                 if filterMode == .all || filterMode == .visited {
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(Color(hex: "#F9234D"))
+                            .fill(Color.appVisited)
                             .frame(width: 10, height: 10)
                         Text("VISITED")
                             .font(.system(size: 10, weight: .black))
@@ -378,7 +378,7 @@ struct MapScreen: View {
                 if filterMode == .all || filterMode == .wishlist {
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(Color(hex: "#93E0FA"))
+                            .fill(Color.appWishlist)
                             .frame(width: 10, height: 10)
                         Text("WISHLIST")
                             .font(.system(size: 10, weight: .black))

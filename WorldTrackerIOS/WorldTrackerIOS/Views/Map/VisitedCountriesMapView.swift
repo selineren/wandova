@@ -372,12 +372,12 @@ struct VisitedCountriesMapView: UIViewRepresentable {
             let countryID = countryID(for: overlay)
 
             if let countryID, visitedCountryIDs.contains(countryID) {
-                renderer.fillColor = UIColor(red: 0.976, green: 0.137, blue: 0.302, alpha: 0.7)
-                renderer.strokeColor = UIColor(red: 0.976, green: 0.137, blue: 0.302, alpha: 0.9)
+                renderer.fillColor = UIColor(red: 0.863, green: 0.149, blue: 0.149, alpha: 0.75)
+                renderer.strokeColor = UIColor(red: 0.863, green: 0.149, blue: 0.149, alpha: 0.95)
                 renderer.lineWidth = 1.5
             } else if let countryID, wantToVisitCountryIDs.contains(countryID) {
-                renderer.fillColor = UIColor(red: 0.576, green: 0.878, blue: 0.980, alpha: 0.7)
-                renderer.strokeColor = UIColor(red: 0.576, green: 0.878, blue: 0.980, alpha: 0.9)
+                renderer.fillColor = UIColor(red: 0.486, green: 0.227, blue: 0.929, alpha: 0.65)
+                renderer.strokeColor = UIColor(red: 0.486, green: 0.227, blue: 0.929, alpha: 0.9)
                 renderer.lineWidth = 1.2
             } else {
                 renderer.fillColor = UIColor.systemGray5.withAlphaComponent(0.85)
