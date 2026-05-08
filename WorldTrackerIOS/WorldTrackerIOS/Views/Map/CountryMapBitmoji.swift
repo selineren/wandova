@@ -57,30 +57,30 @@ class CountryBitmojiAnnotationView: MKAnnotationView {
     
     private let noteIconView: UIView = {
         let container = UIView()
-        container.backgroundColor = .systemBlue
+        container.backgroundColor = .white
         container.layer.cornerRadius = 16
         container.layer.borderWidth = 3.0
         container.layer.borderColor = UIColor.white.cgColor
-        
+
         let icon = UIImageView(image: UIImage(systemName: "note.text"))
-        icon.tintColor = .white
+        icon.tintColor = .darkGray
         icon.contentMode = .scaleAspectFit
         icon.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(icon)
-        
+
         NSLayoutConstraint.activate([
             icon.centerXAnchor.constraint(equalTo: container.centerXAnchor),
             icon.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             icon.widthAnchor.constraint(equalToConstant: 16),
             icon.heightAnchor.constraint(equalToConstant: 16)
         ])
-        
+
         return container
     }()
     
     private let flagView: UIView = {
         let container = UIView()
-        container.backgroundColor = .systemGreen
+        container.backgroundColor = .white
         container.layer.cornerRadius = 16
         container.layer.borderWidth = 3.0
         container.layer.borderColor = UIColor.white.cgColor

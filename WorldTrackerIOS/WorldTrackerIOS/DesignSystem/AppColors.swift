@@ -17,13 +17,13 @@ extension Color {
     // MARK: Borders
     static let appLine   = Color(hex: "#E2E2E2")
 
-    // MARK: Visited (red — matches map fill)
-    static let appVisited    = Color(hex: "#F9234D")
-    static let appVisitedBg  = Color(hex: "#FFF0F5")
+    // MARK: Visited (cherry red — matches map fill)
+    static let appVisited    = Color(hex: "#DC2626")
+    static let appVisitedBg  = Color(hex: "#FEF2F2")
 
-    // MARK: Wishlist (sky blue — matches map fill)
-    static let appWishlist   = Color(hex: "#4A90D9")
-    static let appWishlistBg = Color(hex: "#EAF6FE")
+    // MARK: Wishlist (vivid violet — matches map fill)
+    static let appWishlist   = Color(hex: "#7C3AED")
+    static let appWishlistBg = Color(hex: "#F5F3FF")
 
     // MARK: Achievement (gold)
     static let appGold   = Color(hex: "#E6A817")
