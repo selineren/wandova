@@ -20,6 +20,8 @@ struct AuthScreen: View {
     @State private var isSubmitting = false
     @State private var isSocialSubmitting = false
     @State private var showPassword = false
+    @State private var showResetConfirmation = false
+    @State private var isSendingReset = false
 
     var body: some View {
         ScrollView {
@@ -156,14 +158,27 @@ struct AuthScreen: View {
                 // MARK: - Forgot Password
                 if !isCreatingAccount {
                     Button {
-                        // TODO: forgot password flow
+                        Task { await sendPasswordReset() }
                     } label: {
-                        Text("Forgot password?")
-                            .font(.custom("Inter", size: 14))
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color(hex: "#6B6B6B"))
+                        HStack(spacing: 6) {
+                            if isSendingReset {
+                                ProgressView()
+                                    .scaleEffect(0.75)
+                                    .tint(Color(hex: "#6B6B6B"))
+                            }
+                            Text("Forgot password?")
+                                .font(.custom("Inter", size: 14))
+                                .fontWeight(.bold)
+                                .foregroundStyle(Color(hex: "#6B6B6B"))
+                        }
                     }
+                    .disabled(isSendingReset || isSubmitting)
                     .padding(.top, 20)
+                    .alert("Check your inbox", isPresented: $showResetConfirmation) {
+                        Button("OK", role: .cancel) { }
+                    } message: {
+                        Text("We sent a password reset link to \(email).")
+                    }
                 }
 
                 // MARK: - OR Divider
@@ -261,6 +276,25 @@ struct AuthScreen: View {
         } catch {
             withAnimation(.easeInOut(duration: 0.3)) {
                 errorMessage = friendlyErrorMessage(from: error)
+            }
+        }
+    }
+
+    private func sendPasswordReset() async {
+        guard !email.isEmpty else {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                errorMessage = "Enter your email address above to reset your password"
+            }
+            return
+        }
+        isSendingReset = true
+        defer { isSendingReset = false }
+        do {
+            try await authService.sendPasswordReset(email: email)
+            showResetConfirmation = true
+        } catch {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                errorMessage = "Couldn't send reset email. Check the address and try again."
             }
         }
     }

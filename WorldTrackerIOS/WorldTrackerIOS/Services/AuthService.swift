@@ -147,6 +147,10 @@ final class AuthService: ObservableObject {
         try Auth.auth().signOut()
     }
 
+    func sendPasswordReset(email: String) async throws {
+        try await Auth.auth().sendPasswordReset(withEmail: email)
+    }
+
     // MARK: - Google Sign-In
 
     func signInWithGoogle() async throws {
