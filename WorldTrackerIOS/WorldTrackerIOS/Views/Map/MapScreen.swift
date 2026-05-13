@@ -114,8 +114,11 @@ struct MapScreen: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
 
-                    whereHaveYouBeenPopup
-                        .padding(.bottom, 12)
+                    if showingMapUI {
+                        whereHaveYouBeenPopup
+                            .padding(.bottom, 36)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
 
             }
@@ -253,7 +256,6 @@ struct MapScreen: View {
 
     private var filterPicker: some View {
         HStack(spacing: 8) {
-            Spacer()
             ForEach(FilterMode.allCases, id: \.self) { mode in
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -263,7 +265,7 @@ struct MapScreen: View {
                     Text(mode.rawValue)
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(filterMode == mode ? Color.white : Color.appInk)
-                        .padding(.horizontal, 22)
+                        .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .background(filterMode == mode ? Color.appSurface : Color.appCard)
                         .clipShape(Capsule())
@@ -271,7 +273,6 @@ struct MapScreen: View {
                 }
                 .buttonStyle(.plain)
             }
-            Spacer()
         }
     }
 
