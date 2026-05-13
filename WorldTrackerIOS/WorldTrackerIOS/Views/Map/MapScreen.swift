@@ -64,7 +64,8 @@ struct MapScreen: View {
                     onCountryTapped: { countryID in
                         handleCountryTap(countryID: countryID)
                     },
-                    onBitmojiTapped: nil
+                    onBitmojiTapped: nil,
+                    onZoomLevelChanged: { mapZoomLevel = $0 }
                 )
                 .ignoresSafeArea()
 
@@ -607,6 +608,16 @@ enum MapZoomLevel: Equatable {
     }
 
     var longitudeDelta: CLLocationDegrees { latitudeDelta }
+
+    init(latitudeDelta: CLLocationDegrees) {
+        switch latitudeDelta {
+        case 90...:   self = .world
+        case 40...:   self = .continent
+        case 12.5...: self = .country
+        case 3...:    self = .city
+        default:      self = .max
+        }
+    }
 }
 
 // MARK: - Country Quick Action Sheet
@@ -777,6 +788,7 @@ struct MapContainerView: View {
     let bitmojiAnnotations: [CountryBitmojiAnnotation]
     let onCountryTapped: ((String) -> Void)?
     let onBitmojiTapped: ((String) -> Void)?
+    var onZoomLevelChanged: ((MapZoomLevel) -> Void)? = nil
 
     var body: some View {
         VisitedCountriesMapView(
@@ -785,7 +797,8 @@ struct MapContainerView: View {
             zoomLevel: $zoomLevel,
             onCountryTapped: onCountryTapped,
             bitmojiAnnotations: bitmojiAnnotations,
-            onBitmojiTapped: onBitmojiTapped
+            onBitmojiTapped: onBitmojiTapped,
+            onZoomLevelChanged: onZoomLevelChanged
         )
     }
 }
