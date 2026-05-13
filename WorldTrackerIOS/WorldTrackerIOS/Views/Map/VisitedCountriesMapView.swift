@@ -45,6 +45,7 @@ struct VisitedCountriesMapView: UIViewRepresentable {
     var onCountryTapped: ((String) -> Void)?
     var bitmojiAnnotations: [CountryBitmojiAnnotation] = []
     var onBitmojiTapped: ((String) -> Void)?
+    var onZoomLevelChanged: ((MapZoomLevel) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -52,7 +53,8 @@ struct VisitedCountriesMapView: UIViewRepresentable {
             wantToVisitCountryIDs: wantToVisitCountryIDs,
             zoomLevel: zoomLevel,
             onCountryTapped: onCountryTapped,
-            onBitmojiTapped: onBitmojiTapped
+            onBitmojiTapped: onBitmojiTapped,
+            onZoomLevelChanged: onZoomLevelChanged
         )
     }
 
@@ -120,6 +122,7 @@ struct VisitedCountriesMapView: UIViewRepresentable {
         // Update the callbacks
         context.coordinator.onCountryTapped = onCountryTapped
         context.coordinator.onBitmojiTapped = onBitmojiTapped
+        context.coordinator.onZoomLevelChanged = onZoomLevelChanged
         
         // Handle zoom level changes
         if context.coordinator.currentZoomLevel != zoomLevel {
@@ -212,21 +215,30 @@ struct VisitedCountriesMapView: UIViewRepresentable {
         var overlaysByCountry: [String: [MKOverlay]] = [:]
         var onCountryTapped: ((String) -> Void)?
         var onBitmojiTapped: ((String) -> Void)?
+        var onZoomLevelChanged: ((MapZoomLevel) -> Void)?
         var currentZoomLevel: MapZoomLevel
         var allOverlaysLoaded = false
-        
+
         // Cache overlay -> countryID lookups for performance
         private var overlayCountryCache: [ObjectIdentifier: String] = [:]
-        
+
         // Cache renderers to avoid recreating them on every map render
         private var rendererCache: [ObjectIdentifier: MKOverlayPathRenderer] = [:]
 
-        init(visitedCountryIDs: Set<String>, wantToVisitCountryIDs: Set<String>, zoomLevel: MapZoomLevel, onCountryTapped: ((String) -> Void)?, onBitmojiTapped: ((String) -> Void)?) {
+        init(visitedCountryIDs: Set<String>, wantToVisitCountryIDs: Set<String>, zoomLevel: MapZoomLevel, onCountryTapped: ((String) -> Void)?, onBitmojiTapped: ((String) -> Void)?, onZoomLevelChanged: ((MapZoomLevel) -> Void)? = nil) {
             self.visitedCountryIDs = visitedCountryIDs
             self.wantToVisitCountryIDs = wantToVisitCountryIDs
             self.currentZoomLevel = zoomLevel
             self.onCountryTapped = onCountryTapped
             self.onBitmojiTapped = onBitmojiTapped
+            self.onZoomLevelChanged = onZoomLevelChanged
+        }
+
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            let newLevel = MapZoomLevel(latitudeDelta: mapView.region.span.latitudeDelta)
+            guard newLevel != currentZoomLevel else { return }
+            currentZoomLevel = newLevel
+            onZoomLevelChanged?(newLevel)
         }
         
         func updateMapOverlays(for mapView: MKMapView, toDeactivate: Set<String>, toActivate: Set<String>, toRecolor: Set<String>) {
