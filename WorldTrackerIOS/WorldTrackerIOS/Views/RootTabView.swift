@@ -82,12 +82,12 @@ struct RootTabView: View {
             let countries = CountryDataService.shared.loadCountries()
             if !hasSeededAchievements {
                 hasSeededAchievements = true
-                if achievementNotifier.hasPriorSeenData {
-                    // Normal session: seed so existing achievements don't re-fire on launch.
-                    achievementNotifier.seed(visits: appState.visits, countries: countries)
-                    return
-                }
-                // seenIDs is empty (fresh install or debug reset): fall through to check.
+                // Always seed on first load so existing achievements never re-fire after
+                // reinstall or sign-in on a new device (UserDefaults cleared).
+                // For a brand-new user with no achievements this is a no-op, so they'll
+                // still see popups as they earn achievements going forward.
+                achievementNotifier.seed(visits: appState.visits, countries: countries)
+                return
             }
             achievementCheckTask?.cancel()
             achievementCheckTask = Task { @MainActor in

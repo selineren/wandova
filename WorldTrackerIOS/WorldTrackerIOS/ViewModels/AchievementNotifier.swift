@@ -24,8 +24,6 @@ final class AchievementNotifier: ObservableObject {
         seenKey = "seenUnlockedAchievementIDs_\(userId)"
     }
 
-    var hasPriorSeenData: Bool { !seenIDs.isEmpty }
-
     func seed(visits: [String: Visit], countries: [Country]) {
         let achievements = AchievementEngine.calculateAchievements(visits: visits, countries: countries)
         let ids = Set(achievements.filter { $0.isUnlocked }.map { $0.id })
