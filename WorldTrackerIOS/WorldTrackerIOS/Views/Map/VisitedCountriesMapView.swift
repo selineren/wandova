@@ -91,16 +91,16 @@ struct VisitedCountriesMapView: UIViewRepresentable {
 
         // Load overlays asynchronously to prevent main thread blocking
         let coordinator = context.coordinator
-        DispatchQueue.global(qos: .userInitiated).async { [weak coordinator] in
+        DispatchQueue.global(qos: .userInitiated).async { [weak coordinator, weak mapView] in
             let overlaysByCountry = CountryBoundaryService.shared.getCountryOverlays()
-            
-            // Update map on main thread
-            DispatchQueue.main.async { [weak coordinator] in
-                guard let coordinator = coordinator else { return }
+
+            DispatchQueue.main.async { [weak coordinator, weak mapView] in
+                guard let coordinator = coordinator, let mapView = mapView else { return }
                 coordinator.overlaysByCountry = overlaysByCountry
-                // Add ALL overlays initially (needed for tap detection)
-                let allOverlays = overlaysByCountry.values.flatMap { $0 }
-                mapView.addOverlays(allOverlays)
+                // Only add overlays for countries that need to be colored
+                let activeCountries = coordinator.visitedCountryIDs.union(coordinator.wantToVisitCountryIDs)
+                let activeOverlays = activeCountries.flatMap { overlaysByCountry[$0] ?? [] }
+                mapView.addOverlays(activeOverlays)
                 coordinator.allOverlaysLoaded = true
             }
         }
@@ -143,24 +143,25 @@ struct VisitedCountriesMapView: UIViewRepresentable {
         
         // Update annotations
         updateAnnotations(in: mapView, coordinator: context.coordinator)
-        
-        // OPTIMIZATION: Only update renderer colors if visited or wantToVisit countries changed
-        // Don't add/remove overlays - they're all on the map already
-        if oldVisitedIDs != visitedCountryIDs || oldWantToVisitIDs != wantToVisitCountryIDs {
-            if context.coordinator.allOverlaysLoaded {
-                // Calculate the difference - only update changed countries
-                let visitedAdded = visitedCountryIDs.subtracting(oldVisitedIDs)
-                let visitedRemoved = oldVisitedIDs.subtracting(visitedCountryIDs)
-                let wantToVisitAdded = wantToVisitCountryIDs.subtracting(oldWantToVisitIDs)
-                let wantToVisitRemoved = oldWantToVisitIDs.subtracting(wantToVisitCountryIDs)
-                
-                let changedCountries = visitedAdded
-                    .union(visitedRemoved)
-                    .union(wantToVisitAdded)
-                    .union(wantToVisitRemoved)
-            
-                context.coordinator.updateRendererColors(for: mapView, changedCountries: changedCountries)
+
+        if (oldVisitedIDs != visitedCountryIDs || oldWantToVisitIDs != wantToVisitCountryIDs)
+            && context.coordinator.allOverlaysLoaded {
+            let oldActive = oldVisitedIDs.union(oldWantToVisitIDs)
+            let newActive = visitedCountryIDs.union(wantToVisitCountryIDs)
+
+            let toDeactivate = oldActive.subtracting(newActive)
+            let toActivate = newActive.subtracting(oldActive)
+            // Countries that stayed colored but flipped visited↔wishlist need a color update
+            let toRecolor = oldActive.intersection(newActive).filter { id in
+                oldVisitedIDs.contains(id) != visitedCountryIDs.contains(id)
             }
+
+            context.coordinator.updateMapOverlays(
+                for: mapView,
+                toDeactivate: toDeactivate,
+                toActivate: toActivate,
+                toRecolor: toRecolor
+            )
         }
     }
     
@@ -228,15 +229,28 @@ struct VisitedCountriesMapView: UIViewRepresentable {
             self.onBitmojiTapped = onBitmojiTapped
         }
         
-        // OPTIMIZATION: Update renderer colors only for countries that changed
-        func updateRendererColors(for mapView: MKMapView, changedCountries: Set<String>) {
-            // Only iterate through overlays for countries that actually changed
-            for countryID in changedCountries {
+        func updateMapOverlays(for mapView: MKMapView, toDeactivate: Set<String>, toActivate: Set<String>, toRecolor: Set<String>) {
+            // Remove overlays for countries that lost their color status
+            for countryID in toDeactivate {
                 guard let overlays = overlaysByCountry[countryID] else { continue }
-                
+                mapView.removeOverlays(overlays)
+                for overlay in overlays {
+                    rendererCache.removeValue(forKey: ObjectIdentifier(overlay))
+                }
+            }
+
+            // Add overlays for newly colored countries (renderer will be configured on first draw)
+            for countryID in toActivate {
+                if let overlays = overlaysByCountry[countryID] {
+                    mapView.addOverlays(overlays)
+                }
+            }
+
+            // Update colors for countries that flipped between visited and wishlist
+            for countryID in toRecolor {
+                guard let overlays = overlaysByCountry[countryID] else { continue }
                 for overlay in overlays {
                     let overlayID = ObjectIdentifier(overlay)
-                    // Use cached renderer if available, otherwise get from mapView
                     if let renderer = rendererCache[overlayID] {
                         configure(renderer: renderer, for: overlay)
                         renderer.setNeedsDisplay()
@@ -268,13 +282,8 @@ struct VisitedCountriesMapView: UIViewRepresentable {
                 }
             }
             
-            // Ensure overlays are loaded before processing tap
-            if overlaysByCountry.isEmpty {
-                overlaysByCountry = CountryBoundaryService.shared.getCountryOverlays()
-                let allOverlays = overlaysByCountry.values.flatMap { $0 }
-                mapView.addOverlays(allOverlays)
-                allOverlaysLoaded = true
-            }
+            // Boundary data must be loaded before we can hit-test
+            guard !overlaysByCountry.isEmpty else { return }
             
             // OPTIMIZATION: Spatial filtering - only check countries near tap
             let tapRegion = MKCoordinateRegion(
