@@ -8,24 +8,22 @@
 import SwiftUI
 import MapKit
 
-// MARK: - Map Annotation for Country Bitmoji
+// MARK: - Map Annotation Data Model
 
 class CountryBitmojiAnnotation: NSObject, MKAnnotation {
     let countryID: String
     let country: Country
     let visit: Visit
-    
+
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(
             latitude: country.centroid.latitude,
             longitude: country.centroid.longitude
         )
     }
-    
-    var title: String? {
-        country.name
-    }
-    
+
+    var title: String? { country.name }
+
     init(country: Country, visit: Visit) {
         self.countryID = country.id
         self.country = country
@@ -34,132 +32,55 @@ class CountryBitmojiAnnotation: NSObject, MKAnnotation {
     }
 }
 
-// MARK: - Annotation View
+// MARK: - Pin Tip Shape
 
-class CountryBitmojiAnnotationView: MKAnnotationView {
-    static let identifier = "CountryBitmoji"
-    
-    private let containerView: UIView = {
-        let view = UIView()
-        view.backgroundColor = .clear
-        return view
-    }()
-    
-    private let thumbnailImageView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFill
-        iv.clipsToBounds = true
-        iv.layer.cornerRadius = 16
-        iv.layer.borderWidth = 3.0
-        iv.layer.borderColor = UIColor.white.cgColor
-        return iv
-    }()
-    
-    private let noteIconView: UIView = {
-        let container = UIView()
-        container.backgroundColor = .white
-        container.layer.cornerRadius = 16
-        container.layer.borderWidth = 3.0
-        container.layer.borderColor = UIColor.white.cgColor
-
-        let icon = UIImageView(image: UIImage(systemName: "note.text"))
-        icon.tintColor = .darkGray
-        icon.contentMode = .scaleAspectFit
-        icon.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(icon)
-
-        NSLayoutConstraint.activate([
-            icon.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            icon.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 16),
-            icon.heightAnchor.constraint(equalToConstant: 16)
-        ])
-
-        return container
-    }()
-    
-    private let flagView: UIView = {
-        let container = UIView()
-        container.backgroundColor = .white
-        container.layer.cornerRadius = 16
-        container.layer.borderWidth = 3.0
-        container.layer.borderColor = UIColor.white.cgColor
-        return container
-    }()
-    
-    private let flagLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 20)
-        label.textAlignment = .center
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
-        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
-        setupViews()
+private struct PinTip: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        p.closeSubpath()
+        return p
     }
-    
-    required init?(coder aDecoder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    private func setupViews() {
-        frame = CGSize(width: 32, height: 32).asRect
-        centerOffset = CGPoint(x: 0, y: 0) // No offset - center the circle on the location
-        
-        addSubview(containerView)
-        containerView.frame = bounds
-        
-        thumbnailImageView.frame = CGRect(x: 0, y: 0, width: 32, height: 32)
-        noteIconView.frame = CGRect(x: 0, y: 0, width: 32, height: 32)
-        flagView.frame = CGRect(x: 0, y: 0, width: 32, height: 32)
-        
-        flagView.addSubview(flagLabel)
-        NSLayoutConstraint.activate([
-            flagLabel.centerXAnchor.constraint(equalTo: flagView.centerXAnchor),
-            flagLabel.centerYAnchor.constraint(equalTo: flagView.centerYAnchor)
-        ])
-        
-        containerView.addSubview(thumbnailImageView)
-        containerView.addSubview(noteIconView)
-        containerView.addSubview(flagView)
-        
-        // Enable tap
-        isEnabled = true
-        canShowCallout = false
-    }
-    
-    func configure(with annotation: CountryBitmojiAnnotation) {
-        // Always set the flag
-        flagLabel.text = annotation.country.flagEmoji
-        
-        if let firstPhoto = annotation.visit.photos.first,
-           let image = UIImage(data: firstPhoto.imageData) {
-            // Show photo thumbnail - this is the main feature!
-            thumbnailImageView.image = image
-            thumbnailImageView.isHidden = false
-            noteIconView.isHidden = true
-            flagView.isHidden = true
-        } else if !annotation.visit.notes.isEmpty {
-            // Show note icon when no photo
-            thumbnailImageView.isHidden = true
-            noteIconView.isHidden = false
-            flagView.isHidden = true
-        } else {
-            // Show flag emoji when no content
-            thumbnailImageView.isHidden = true
-            noteIconView.isHidden = true
-            flagView.isHidden = false
+}
+
+// MARK: - SwiftUI Annotation View
+
+struct BitmojiAnnotationView: View {
+    let annotation: CountryBitmojiAnnotation
+
+    private let headSize: CGFloat = 42
+
+    var body: some View {
+        VStack(spacing: -2) {
+            // Pin head
+            ZStack {
+                Circle()
+                    .fill(Color.appCard)
+
+                if let photo = annotation.visit.photos.first,
+                   let img = UIImage(data: photo.imageData) {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFill()
+                        .clipShape(Circle())
+                        .padding(2.5)
+                } else {
+                    Text(annotation.country.flagEmoji)
+                        .font(.system(size: 22))
+                }
+
+                Circle()
+                    .stroke(Color.appVisited, lineWidth: 2.5)
+            }
+            .frame(width: headSize, height: headSize)
+            .shadow(color: .black.opacity(0.22), radius: 6, x: 0, y: 3)
+
+            // Pin tip
+            PinTip()
+                .fill(Color.appVisited)
+                .frame(width: 13, height: 9)
         }
     }
 }
-
-// MARK: - Helper Extension
-
-extension CGSize {
-    var asRect: CGRect {
-        CGRect(origin: .zero, size: self)
-    }
-}
-

@@ -19,7 +19,7 @@ struct MapScreen: View {
     @State private var showSyncStatus = true
     @State private var selectedCountryForSheet: SelectedCountry?
     @State private var selectedCountryForDetail: Country?
-    @State private var mapZoomLevel: MapZoomLevel = .continent
+    @State private var currentLatDelta: Double = 60
     @State private var showingMapUI = true
     @State private var filterMode: FilterMode = .all
     @State private var totalCountries: Int = 0
@@ -59,13 +59,13 @@ struct MapScreen: View {
                 MapContainerView(
                     visitedCountryIDs: filteredVisitedCountryIDs,
                     wantToVisitCountryIDs: filteredWantToVisitCountryIDs,
-                    zoomLevel: $mapZoomLevel,
+                    latDelta: $currentLatDelta,
                     bitmojiAnnotations: getBitmojiAnnotations(),
                     onCountryTapped: { countryID in
                         handleCountryTap(countryID: countryID)
                     },
                     onBitmojiTapped: nil,
-                    onZoomLevelChanged: { mapZoomLevel = $0 }
+                    onLatDeltaChanged: { currentLatDelta = $0 }
                 )
                 .ignoresSafeArea()
 
@@ -111,13 +111,13 @@ struct MapScreen: View {
                             filterPicker
                                 .padding(.horizontal, 16)
                         }
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 4)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
 
                     if showingMapUI {
                         whereHaveYouBeenPopup
-                            .padding(.bottom, 36)
+                            .padding(.bottom, 8)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
@@ -224,33 +224,21 @@ struct MapScreen: View {
         .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 3)
     }
 
-    private var canZoomIn: Bool { mapZoomLevel != .max }
-    private var canZoomOut: Bool { mapZoomLevel != .world }
+    private var canZoomIn: Bool { currentLatDelta > 0.5 }
+    private var canZoomOut: Bool { currentLatDelta < 170 }
 
     private func zoomIn() {
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.prepare()
         generator.impactOccurred()
-        switch mapZoomLevel {
-        case .world:     mapZoomLevel = .continent
-        case .continent: mapZoomLevel = .country
-        case .country:   mapZoomLevel = .city
-        case .city:      mapZoomLevel = .max
-        case .max:       break
-        }
+        currentLatDelta = max(0.5, currentLatDelta / 2.0)
     }
 
     private func zoomOut() {
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.prepare()
         generator.impactOccurred()
-        switch mapZoomLevel {
-        case .max:       mapZoomLevel = .city
-        case .city:      mapZoomLevel = .country
-        case .country:   mapZoomLevel = .continent
-        case .continent: mapZoomLevel = .world
-        case .world:     break
-        }
+        currentLatDelta = min(180, currentLatDelta * 2.0)
     }
 
     // MARK: - Filter Picker
@@ -558,7 +546,7 @@ struct MapScreen: View {
     }
 
     private func getBitmojiAnnotations() -> [CountryBitmojiAnnotation] {
-        guard mapZoomLevel != .world else { return [] }
+        guard currentLatDelta < 90 else { return [] }
         guard filterMode == .all || filterMode == .visited else { return [] }
 
         let countries = CountryDataService.shared.loadCountries()
@@ -784,21 +772,21 @@ struct CountryQuickActionSheet: View {
 struct MapContainerView: View {
     let visitedCountryIDs: Set<String>
     let wantToVisitCountryIDs: Set<String>
-    @Binding var zoomLevel: MapZoomLevel
+    @Binding var latDelta: Double
     let bitmojiAnnotations: [CountryBitmojiAnnotation]
     let onCountryTapped: ((String) -> Void)?
     let onBitmojiTapped: ((String) -> Void)?
-    var onZoomLevelChanged: ((MapZoomLevel) -> Void)? = nil
+    var onLatDeltaChanged: ((Double) -> Void)? = nil
 
     var body: some View {
         VisitedCountriesMapView(
             visitedCountryIDs: visitedCountryIDs,
             wantToVisitCountryIDs: wantToVisitCountryIDs,
-            zoomLevel: $zoomLevel,
+            latDelta: $latDelta,
             onCountryTapped: onCountryTapped,
             bitmojiAnnotations: bitmojiAnnotations,
             onBitmojiTapped: onBitmojiTapped,
-            onZoomLevelChanged: onZoomLevelChanged
+            onLatDeltaChanged: onLatDeltaChanged
         )
     }
 }
