@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AuthenticationServices
 
 struct AuthScreen: View {
     @EnvironmentObject private var authService: AuthService
@@ -218,6 +219,30 @@ struct AuthScreen: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
                         .background(Color.appPaper2)
+                        .clipShape(Capsule())
+                    }
+                    .disabled(isSocialSubmitting || isSubmitting)
+
+                    // Apple
+                    Button {
+                        Task { await submitSocial { try await authService.signInWithApple() } }
+                    } label: {
+                        HStack(spacing: 12) {
+                            if isSocialSubmitting {
+                                ProgressView().tint(Color.appPaper)
+                            } else {
+                                Image(systemName: "apple.logo")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(Color.appPaper)
+                            }
+                            Text("Continue with Apple")
+                                .font(.custom("Inter", size: 16))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.appPaper)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(Color.appInk)
                         .clipShape(Capsule())
                     }
                     .disabled(isSocialSubmitting || isSubmitting)
