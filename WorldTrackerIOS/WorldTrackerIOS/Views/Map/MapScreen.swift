@@ -26,6 +26,7 @@ struct MapScreen: View {
     @State private var allCountries: [Country] = []
     @State private var isPopupExpanded = false
     @State private var showingMemoriesSheet = false
+    @State private var showingExportSheet = false
 
     enum FilterMode: String, CaseIterable {
         case all = "All"
@@ -144,6 +145,11 @@ struct MapScreen: View {
             }
             .sheet(isPresented: $showingMemoriesSheet) {
                 MapMemoriesSheet(visits: appState.visits, countries: allCountries)
+            }
+            .sheet(isPresented: $showingExportSheet) {
+                MapExportSheet(totalCountries: totalCountries)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.hidden)
             }
             .sheet(item: $selectedCountryForSheet) { selectedCountry in
                 CountryQuickActionSheet(
@@ -424,6 +430,9 @@ struct MapScreen: View {
                     quickActionButton(icon: "chart.bar.fill", label: "Stats") {
                         onNavigateToStats()
                         withAnimation(.spring(response: 0.3)) { isPopupExpanded = false }
+                    }
+                    quickActionButton(icon: "square.and.arrow.up", label: "Export Map") {
+                        showingExportSheet = true
                     }
                 }
                 .padding(.horizontal, 20)
