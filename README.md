@@ -1,110 +1,81 @@
-# World Tracker iOS
+# Wandova
 
-A SwiftUI-based iOS application for tracking countries you've visited and those you want to visit, with interactive map visualization, personal notes, and cloud synchronization.
-
-## Overview
-
-World Tracker helps users document their travel experiences by:
-- Marking countries as visited or on their wishlist
-- Adding photos and notes for each country
-- Visualizing their travel progress on an interactive map
-- Earning achievements as they explore more of the world
-- Syncing data across devices with Firebase
+A SwiftUI iOS app for tracking the countries you've visited and the ones still on your list — with an interactive map, personal notes, stats, and cloud sync.
 
 ## Features
 
-### Core Functionality
-- **Country Tracking** – Mark countries as visited or want-to-visit
-- **Interactive Map** – Visual representation of tracked countries using MapKit with optimized rendering
-- **Photo & Notes** – Add personal memories and observations for each country
-- **Search & Filter** – Find countries by name or filter by continent
-
-### Progress & Insights
-- **Stats Dashboard** – Track visited countries, continents, and world coverage percentage
-- **Achievements System** – Unlock milestones based on travel progress
-
-### Sync & Reliability
-- **Firebase Authentication** – Secure user accounts with email/password
-- **Cloud Sync** – Automatic synchronization with Firestore
-- **Offline Support** – Full functionality without internet, with automatic sync recovery
+- **Interactive Map** — Visualize your visited and want-to-visit countries on a world map powered by MapKit
+- **Country Tracking** — Mark countries as visited or on your wishlist, add photos and personal notes
+- **Stats Dashboard** — See how many countries and continents you've covered and your world coverage percentage
+- **Achievements** — Unlock milestones as your travel footprint grows
+- **Travel Comparison** — Compare your visited countries with friends
+- **Map Export** — Export a snapshot of your travel map to share
+- **Search & Filter** — Find countries by name or browse by continent
+- **Cloud Sync** — Data syncs automatically across devices via Firestore
+- **Offline Support** — Full functionality without internet; changes sync when connectivity returns
+- **Sign in with Apple & Google** — Secure, fast authentication
 
 ## Tech Stack
 
-**Frontend**
-- SwiftUI
-- MapKit
-
-**Data & Persistence**
-- SwiftData (local storage)
-- Firestore (cloud storage)
-- Firebase Authentication
-
-**Patterns & Architecture**
-- MVVM (Model-View-ViewModel)
-- Repository Pattern (abstraction over local/cloud storage)
+| Layer | Technology |
+|---|---|
+| UI | SwiftUI |
+| Map | MapKit |
+| Local storage | SwiftData |
+| Cloud storage | Firestore |
+| Authentication | Firebase Auth, Sign in with Apple, Google Sign-In |
+| Architecture | MVVM + Repository Pattern |
 
 ## Architecture
 
-The app follows a clean, layered architecture:
-- SwiftUI Views    
-- ViewModels (AppState) 
-- Repository Layer (Local + Cloud)
-- SwiftData ←→ Sync ←→ Firestore 
+```
+SwiftUI Views
+    └── ViewModels (AppState)
+            └── Repository Layer
+                    ├── SwiftData (local)
+                    └── Firestore (cloud)
+                            └── SyncService (bi-directional sync)
+```
 
-**Key Components:**
-- **AppState**: Central state management coordinating repositories and sync
-- **Repository Pattern**: Unified interface for local (SwiftData) and cloud (Firestore) data sources
-- **SyncService**: Handles bi-directional synchronization between local and cloud storage
-- **AuthService**: Manages Firebase authentication state
+- **AppState** — Central state management coordinating repositories and sync
+- **SyncService** — Handles bi-directional sync between local and cloud storage
+- **AuthService** — Manages Firebase authentication and sign-in providers
 
-## Development Phases
-
-The project was built iteratively across multiple phases:
-
-1. **Foundation** – Core SwiftUI setup, country data model, basic list view
-2. **Map Integration** – MapKit visualization with country boundaries and visit state rendering
-3. **Data Enrichment** – Added photos, notes, and want-to-visit functionality
-4. **Gamification** – Stats dashboard and achievements system
-5. **Search & Discovery** – Country search and continent-based filtering
-6. **Cloud Sync** – Firebase integration with authentication and Firestore synchronization
-7. **Optimization** – Map rendering performance improvements and offline support
-
-## How to Run
+## Getting Started
 
 ### Prerequisites
-- Xcode 15.0 or later
-- iOS 17.0+ deployment target
-- Active internet connection (for Firebase features)
+- Xcode 16.0 or later
+- iOS 17.6+ deployment target
+- A Firebase project with Authentication and Firestore enabled
 
 ### Setup
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/world-tracker-ios.git
-   cd world-tracker-ios
+   git clone https://github.com/selineren/wandova-ios.git
+   cd wandova-ios
+   ```
 
-2. Configure Firebase
-   • Create a Firebase project at firebase.google.com
-   • Add an iOS app to your Firebase project
-   • Download Google​Service​-​Info​.plist and add it to the Xcode project
-   • Enable Authentication (Email/Password) and Firestore Database in Firebase Console
+2. **Configure Firebase**
+   - Create a project at [firebase.google.com](https://firebase.google.com)
+   - Add an iOS app with bundle ID `com.selineren.Wandova`
+   - Download `GoogleService-Info.plist` and place it at `WandovaIOS/Wandova/GoogleService-Info.plist`
+   - Enable Email/Password, Google, and Apple sign-in methods in Firebase Console
 
-3. Open in Xcode
-open WorldTrackerIOS.xcodeproj
+3. **Open in Xcode**
+   ```bash
+   open WandovaIOS/Wandova.xcodeproj
+   ```
 
-4. Run the app
-   • Select a simulator or connected device
-   • Press Cmd + ​R to build and run
+4. **Run**
+   Select a simulator or device and press `Cmd+R`
 
-Notes
+### Notes
 
-Firebase Configuration
-The app requires a valid Google​Service​-​Info​.plist file for Firebase features to work. Without it, the app will fail to launch. If you want to run the app without Firebase, you'll need to modify the initialization code in WorldTrackerIOSApp.swift􀰓.
+- `GoogleService-Info.plist` is excluded from version control — you must add it manually
+- Country boundaries are loaded from a bundled GeoJSON file — no external API needed
+- Offline changes are queued locally and synced automatically when connectivity is restored
 
-Offline Mode
-The app fully supports offline usage. All changes made offline are queued and automatically synchronized when connectivity is restored.
+---
 
-Country Data
-Country boundaries and geographic data are loaded from embedded GeoJSON files in the app bundle.
-
-Built with SwiftUI • Designed for iOS 17+
+Built with SwiftUI · Designed for iOS 17.6+
