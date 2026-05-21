@@ -35,19 +35,22 @@ final class MapSnapshotService {
         let visitedCount  = effVisited.count
         let wishlistCount = effWishlist.count
         let scale: CGFloat = highQuality ? 2 : 1
+        let logo = UIImage(named: "AppLogo")
 
-        return await Task.detached(priority: .userInitiated) { [effVisited, effWishlist] in
+        return await Task.detached(priority: .userInitiated) { [effVisited, effWishlist, logo] in
             let overlays = CountryBoundaryService.shared.getCountryOverlays()
             switch style {
             case .flat:
                 return Self.renderFlat(
                     overlays: overlays, visitedIDs: effVisited, wishlistIDs: effWishlist,
-                    layer: layer, visitedCount: visitedCount, wishlistCount: wishlistCount, scale: scale
+                    layer: layer, visitedCount: visitedCount, wishlistCount: wishlistCount,
+                    scale: scale, logo: logo
                 )
             case .globe:
                 return Self.renderGlobe(
                     overlays: overlays, visitedIDs: effVisited, wishlistIDs: effWishlist,
-                    layer: layer, visitedCount: visitedCount, wishlistCount: wishlistCount, scale: scale
+                    layer: layer, visitedCount: visitedCount, wishlistCount: wishlistCount,
+                    scale: scale, logo: logo
                 )
             }
         }.value
@@ -62,7 +65,8 @@ final class MapSnapshotService {
         layer: MapExportLayer,
         visitedCount: Int,
         wishlistCount: Int,
-        scale: CGFloat
+        scale: CGFloat,
+        logo: UIImage?
     ) -> UIImage {
         let size     = CGSize(width: 720, height: 450)
         let footerH  = size.height * 0.13
@@ -88,7 +92,7 @@ final class MapSnapshotService {
             }
 
             drawFlatFooter(ctx: cg, size: size, footerH: footerH,
-                           layer: layer, visitedCount: visitedCount, wishlistCount: wishlistCount)
+                           layer: layer, visitedCount: visitedCount, wishlistCount: wishlistCount, logo: logo)
         }
     }
 
@@ -131,7 +135,8 @@ final class MapSnapshotService {
 
     private static func drawFlatFooter(
         ctx: CGContext, size: CGSize, footerH: CGFloat,
-        layer: MapExportLayer, visitedCount: Int, wishlistCount: Int
+        layer: MapExportLayer, visitedCount: Int, wishlistCount: Int,
+        logo: UIImage?
     ) {
         let footerY = size.height - footerH
 
@@ -143,22 +148,51 @@ final class MapSnapshotService {
         ctx.restoreGState()
 
         let nameAttr: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 15, weight: .black),
+            .font: UIFont.systemFont(ofSize: 14, weight: .black),
             .foregroundColor: UIColor.white,
             .kern: 2.0
         ]
         let name   = NSAttributedString(string: "WORLDTRACKER", attributes: nameAttr)
         let nameSz = name.size()
-        let nameY  = footerY + (footerH - nameSz.height) / 2 - 9
-        name.draw(at: CGPoint(x: (size.width - nameSz.width) / 2, y: nameY))
 
         let statsAttr: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 10, weight: .medium),
-            .foregroundColor: UIColor.white.withAlphaComponent(0.45)
+            .foregroundColor: UIColor.white.withAlphaComponent(0.4)
         ]
-        let statsStr = NSAttributedString(string: footerStats(layer: layer, visitedCount: visitedCount, wishlistCount: wishlistCount), attributes: statsAttr)
-        let statsSz  = statsStr.size()
-        statsStr.draw(at: CGPoint(x: (size.width - statsSz.width) / 2, y: nameY + nameSz.height + 5))
+        let statsStr = NSAttributedString(
+            string: footerStats(layer: layer, visitedCount: visitedCount, wishlistCount: wishlistCount),
+            attributes: statsAttr
+        )
+        let statsSz = statsStr.size()
+
+        let iconSize: CGFloat = 22
+        let iconCorner: CGFloat = iconSize * 0.22
+        let iconTextGap: CGFloat = 9
+        let lineGap: CGFloat = 4
+        let nameRowH = max(iconSize, nameSz.height)
+        let blockH   = nameRowH + lineGap + statsSz.height
+        let blockY   = footerY + (footerH - blockH) / 2
+
+        // Center [icon + gap + name] as a unit
+        let rowW = iconSize + iconTextGap + nameSz.width
+        let rowX = (size.width - rowW) / 2
+
+        if let logo {
+            let iconRect = CGRect(x: rowX, y: blockY + (nameRowH - iconSize) / 2, width: iconSize, height: iconSize)
+            // Clip to rounded rect, draw image, then stroke a subtle border
+            ctx.saveGState()
+            UIBezierPath(roundedRect: iconRect, cornerRadius: iconCorner).addClip()
+            logo.draw(in: iconRect)
+            ctx.restoreGState()
+            ctx.saveGState()
+            ctx.setStrokeColor(UIColor.white.withAlphaComponent(0.18).cgColor)
+            ctx.setLineWidth(0.75)
+            UIBezierPath(roundedRect: iconRect.insetBy(dx: 0.4, dy: 0.4), cornerRadius: iconCorner).stroke()
+            ctx.restoreGState()
+        }
+
+        name.draw(at: CGPoint(x: rowX + iconSize + iconTextGap, y: blockY + (nameRowH - nameSz.height) / 2))
+        statsStr.draw(at: CGPoint(x: (size.width - statsSz.width) / 2, y: blockY + nameRowH + lineGap))
     }
 
     // MARK: - Globe (Orthographic)
@@ -170,7 +204,8 @@ final class MapSnapshotService {
         layer: MapExportLayer,
         visitedCount: Int,
         wishlistCount: Int,
-        scale: CGFloat
+        scale: CGFloat,
+        logo: UIImage?
     ) -> UIImage {
         let size    = CGSize(width: 540, height: 640)
         let footerH = size.height * 0.15
@@ -237,7 +272,7 @@ final class MapSnapshotService {
             cg.setLineWidth(1); cg.strokePath()
 
             drawGlobeFooter(ctx: cg, size: size, footerH: footerH,
-                            layer: layer, visitedCount: visitedCount, wishlistCount: wishlistCount)
+                            layer: layer, visitedCount: visitedCount, wishlistCount: wishlistCount, logo: logo)
         }
     }
 
@@ -299,26 +334,53 @@ final class MapSnapshotService {
 
     private static func drawGlobeFooter(
         ctx: CGContext, size: CGSize, footerH: CGFloat,
-        layer: MapExportLayer, visitedCount: Int, wishlistCount: Int
+        layer: MapExportLayer, visitedCount: Int, wishlistCount: Int,
+        logo: UIImage?
     ) {
         let footerY = size.height - footerH
 
         let nameAttr: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 14, weight: .black),
+            .font: UIFont.systemFont(ofSize: 13, weight: .black),
             .foregroundColor: UIColor.white,
             .kern: 2.0
         ]
         let name   = NSAttributedString(string: "WORLDTRACKER", attributes: nameAttr)
         let nameSz = name.size()
-        name.draw(at: CGPoint(x: (size.width - nameSz.width) / 2, y: footerY + 14))
 
         let statsAttr: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 10, weight: .medium),
-            .foregroundColor: UIColor.white.withAlphaComponent(0.45)
+            .foregroundColor: UIColor.white.withAlphaComponent(0.4)
         ]
-        let statsStr = NSAttributedString(string: footerStats(layer: layer, visitedCount: visitedCount, wishlistCount: wishlistCount), attributes: statsAttr)
-        let statsSz  = statsStr.size()
-        statsStr.draw(at: CGPoint(x: (size.width - statsSz.width) / 2, y: footerY + 14 + nameSz.height + 6))
+        let statsStr = NSAttributedString(
+            string: footerStats(layer: layer, visitedCount: visitedCount, wishlistCount: wishlistCount),
+            attributes: statsAttr
+        )
+        let statsSz = statsStr.size()
+
+        // Vertical stack: icon → name → stats, all centered
+        let iconSize: CGFloat = 30
+        let iconCorner: CGFloat = iconSize * 0.22
+        let iconNameGap: CGFloat = 9
+        let nameStatsGap: CGFloat = 5
+        let blockH = iconSize + iconNameGap + nameSz.height + nameStatsGap + statsSz.height
+        let blockY = footerY + (footerH - blockH) / 2
+        let cx = size.width / 2
+
+        if let logo {
+            let iconRect = CGRect(x: cx - iconSize / 2, y: blockY, width: iconSize, height: iconSize)
+            ctx.saveGState()
+            UIBezierPath(roundedRect: iconRect, cornerRadius: iconCorner).addClip()
+            logo.draw(in: iconRect)
+            ctx.restoreGState()
+            ctx.saveGState()
+            ctx.setStrokeColor(UIColor.white.withAlphaComponent(0.18).cgColor)
+            ctx.setLineWidth(0.75)
+            UIBezierPath(roundedRect: iconRect.insetBy(dx: 0.4, dy: 0.4), cornerRadius: iconCorner).stroke()
+            ctx.restoreGState()
+        }
+
+        name.draw(at: CGPoint(x: cx - nameSz.width / 2, y: blockY + iconSize + iconNameGap))
+        statsStr.draw(at: CGPoint(x: cx - statsSz.width / 2, y: blockY + iconSize + iconNameGap + nameSz.height + nameStatsGap))
     }
 
     // MARK: - Shared helpers
