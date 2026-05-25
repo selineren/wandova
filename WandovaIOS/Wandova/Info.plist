@@ -6,6 +6,8 @@
 	<string>Wandova</string>
 	<key>CFBundleName</key>
 	<string>Wandova</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
