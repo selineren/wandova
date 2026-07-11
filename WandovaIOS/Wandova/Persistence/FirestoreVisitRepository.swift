@@ -10,7 +10,7 @@ import FirebaseAuth
 import FirebaseFirestore
 import FirebaseCore
 
-final class FirestoreVisitRepository {
+final class FirestoreVisitRepository: RemoteVisitRepository {
     private let db = Firestore.firestore()
 
     // MARK: - Public API

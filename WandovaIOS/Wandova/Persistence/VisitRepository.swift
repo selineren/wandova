@@ -18,4 +18,14 @@ protocol VisitRepository {
     func updatePhotoCaption(_ countryId: String, photoId: UUID, caption: String) throws
     func upsert(_ visit: Visit) throws
     func visitedCount() throws -> Int
+    func deleteAllVisits() throws
+}
+
+/// Cloud-backed visit store as consumed by SyncService, including the
+/// photo subcollection operations.
+protocol RemoteVisitRepository {
+    func allVisits() async throws -> [Visit]
+    func setVisit(_ visit: Visit) async throws
+    func syncPhotos(countryId: String, localPhotos: [VisitPhoto]) async throws -> [VisitPhoto]
+    func deletePhoto(countryId: String, photoId: UUID) async throws
 }

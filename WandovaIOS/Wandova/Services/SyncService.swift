@@ -10,20 +10,20 @@ import FirebaseAuth
 
 @MainActor
 final class SyncService {
-    private let localRepository: SwiftDataVisitRepository
-    private let cloudRepository: FirestoreVisitRepository
+    private let localRepository: VisitRepository
+    private let cloudRepository: RemoteVisitRepository
     private let networkMonitor: NetworkMonitor
-    
+
     private var isSyncing = false
     private(set) var lastSyncDate: Date?
-    
+
     // Retry configuration
     private let maxRetries = 3
     private let retryDelay: TimeInterval = 2.0
 
     init(
-        localRepository: SwiftDataVisitRepository,
-        cloudRepository: FirestoreVisitRepository,
+        localRepository: VisitRepository,
+        cloudRepository: RemoteVisitRepository,
         networkMonitor: NetworkMonitor? = nil
     ) {
         self.localRepository = localRepository

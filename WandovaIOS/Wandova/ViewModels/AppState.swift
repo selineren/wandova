@@ -432,9 +432,7 @@ final class AppState: ObservableObject {
     
     func clearLocalDataAfterSignOut() {
         do {
-            if let localRepository = repository as? SwiftDataVisitRepository {
-                try localRepository.deleteAllVisits()
-            }
+            try repository.deleteAllVisits()
             clearLocalState()
         } catch {
             #if DEBUG
