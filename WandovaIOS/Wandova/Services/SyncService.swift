@@ -13,6 +13,7 @@ final class SyncService {
     private let localRepository: VisitRepository
     private let cloudRepository: RemoteVisitRepository
     private let networkMonitor: NetworkMonitor
+    private let isAuthenticated: () -> Bool
 
     private var isSyncing = false
     private(set) var lastSyncDate: Date?
@@ -24,11 +25,13 @@ final class SyncService {
     init(
         localRepository: VisitRepository,
         cloudRepository: RemoteVisitRepository,
-        networkMonitor: NetworkMonitor? = nil
+        networkMonitor: NetworkMonitor? = nil,
+        isAuthenticated: @escaping () -> Bool = { Auth.auth().currentUser != nil }
     ) {
         self.localRepository = localRepository
         self.cloudRepository = cloudRepository
         self.networkMonitor = networkMonitor ?? .shared
+        self.isAuthenticated = isAuthenticated
     }
 
     func syncVisits(withRetry: Bool = true) async throws {
@@ -37,7 +40,7 @@ final class SyncService {
         #endif
         
         // AUTH GUARD: Don't sync if user is not authenticated
-        guard Auth.auth().currentUser != nil else {
+        guard isAuthenticated() else {
             print("⚠️ Sync skipped: User is not authenticated")
             throw FirestoreVisitRepositoryError.notAuthenticated
         }
@@ -236,7 +239,7 @@ final class SyncService {
 
     /// Deletes a single photo from the Firestore photos subcollection. Best-effort — errors are logged but not thrown.
     func deleteCloudPhoto(countryId: String, photoId: UUID) async {
-        guard Auth.auth().currentUser != nil else { return }
+        guard isAuthenticated() else { return }
         do {
             try await cloudRepository.deletePhoto(countryId: countryId, photoId: photoId)
         } catch {

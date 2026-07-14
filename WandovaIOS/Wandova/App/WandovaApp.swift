@@ -14,6 +14,11 @@ import CoreText
 
 @main
 struct WandovaApp: App {
+    /// True when the process is hosting unit tests. The app UI must stay inert
+    /// then — otherwise the real auth listener kicks off a live Firestore sync
+    /// that races the tests.
+    private static let isRunningUnitTests = NSClassFromString("XCTestCase") != nil
+
     @StateObject private var authService = AuthService()
     @StateObject private var achievementNotifier = AchievementNotifier()
 
@@ -100,6 +105,9 @@ struct WandovaApp: App {
 
     var body: some Scene {
         WindowGroup {
+            if Self.isRunningUnitTests {
+                Text("Running unit tests")
+            } else {
             AuthGatedRootView()
                 .environmentObject(appState)
                 .environmentObject(authService)
@@ -115,6 +123,7 @@ struct WandovaApp: App {
                 } message: {
                     Text("Your data could not be loaded from storage. Changes made this session will not be saved. Please restart the app — if this keeps happening, try reinstalling.")
                 }
+            }
         }
         .modelContainer(container)
     }

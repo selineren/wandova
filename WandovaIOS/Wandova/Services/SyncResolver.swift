@@ -45,6 +45,28 @@ enum SyncResolver {
         }
     }
 
+    /// Result of merging local and cloud photo sets for one country.
+    struct PhotoMerge: Equatable {
+        /// Photos that exist only locally and must be written to the cloud.
+        let toUpload: [VisitPhoto]
+        /// The union of both sides, keyed by photo ID: local photos first,
+        /// then cloud-only photos.
+        let merged: [VisitPhoto]
+    }
+
+    /// Union-merge by photo ID. A photo absent from the cloud uploads; a photo
+    /// absent locally comes down. Photos present on both sides are left alone —
+    /// the local copy wins in `merged`.
+    static func mergePhotos(local: [VisitPhoto], cloud: [VisitPhoto]) -> PhotoMerge {
+        let cloudIds = Set(cloud.map { $0.id })
+        let localIds = Set(local.map { $0.id })
+
+        return PhotoMerge(
+            toUpload: local.filter { !cloudIds.contains($0.id) },
+            merged: local + cloud.filter { !localIds.contains($0.id) }
+        )
+    }
+
     /// When a cloud visit overwrites local, prefer the existing local photos;
     /// the photo subcollection sync handles cross-device transfer. If there are
     /// no existing local photos, keep any photos decoded from the legacy "photos"

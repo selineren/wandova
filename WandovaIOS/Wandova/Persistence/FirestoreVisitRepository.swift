@@ -433,14 +433,13 @@ final class FirestoreVisitRepository: RemoteVisitRepository {
         let snapshot = try await getDocuments(from: ref)
         let cloudPhotos = snapshot.documents.compactMap { photoFromDocument($0) }
 
-        let cloudIds = Set(cloudPhotos.map { $0.id })
-        let localIds  = Set(localPhotos.map { $0.id })
+        let merge = SyncResolver.mergePhotos(local: localPhotos, cloud: cloudPhotos)
 
-        for photo in localPhotos where !cloudIds.contains(photo.id) {
+        for photo in merge.toUpload {
             try await setData(photoDocument(photo), for: ref.document(photo.id.uuidString))
         }
 
-        return localPhotos + cloudPhotos.filter { !localIds.contains($0.id) }
+        return merge.merged
     }
 
     func deletePhoto(countryId: String, photoId: UUID) async throws {

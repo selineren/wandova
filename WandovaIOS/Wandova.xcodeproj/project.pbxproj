@@ -14,8 +14,19 @@
 		04CB46142FAD28CA00883B87 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 04CB46132FAD28CA00883B87 /* GoogleSignInSwift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		7E57E5700000000000000007 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 04ACF9CD2F4E45E0004448FC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 04ACF9D42F4E45E0004448FC;
+			remoteInfo = Wandova;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		04ACF9D52F4E45E0004448FC /* Wandova.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Wandova.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7E57E5700000000000000001 /* WandovaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WandovaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -37,6 +48,13 @@
 			path = Wandova;
 			sourceTree = "<group>";
 		};
+		7E57E5700000000000000002 /* WandovaTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = WandovaTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +70,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7E57E5700000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -59,6 +84,7 @@
 			isa = PBXGroup;
 			children = (
 				04ACF9D72F4E45E0004448FC /* Wandova */,
+				7E57E5700000000000000002 /* WandovaTests */,
 				04ACF9D62F4E45E0004448FC /* Products */,
 			);
 			sourceTree = "<group>";
@@ -67,6 +93,7 @@
 			isa = PBXGroup;
 			children = (
 				04ACF9D52F4E45E0004448FC /* Wandova.app */,
+				7E57E5700000000000000001 /* WandovaTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -101,6 +128,29 @@
 			productReference = 04ACF9D52F4E45E0004448FC /* Wandova.app */;
 			productType = "com.apple.product-type.application";
 		};
+		7E57E5700000000000000006 /* WandovaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7E57E570000000000000000B /* Build configuration list for PBXNativeTarget "WandovaTests" */;
+			buildPhases = (
+				7E57E5700000000000000003 /* Sources */,
+				7E57E5700000000000000004 /* Frameworks */,
+				7E57E5700000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7E57E5700000000000000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				7E57E5700000000000000002 /* WandovaTests */,
+			);
+			name = WandovaTests;
+			packageProductDependencies = (
+			);
+			productName = WandovaTests;
+			productReference = 7E57E5700000000000000001 /* WandovaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -113,6 +163,10 @@
 				TargetAttributes = {
 					04ACF9D42F4E45E0004448FC = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					7E57E5700000000000000006 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = 04ACF9D42F4E45E0004448FC;
 					};
 				};
 			};
@@ -135,12 +189,20 @@
 			projectRoot = "";
 			targets = (
 				04ACF9D42F4E45E0004448FC /* Wandova */,
+				7E57E5700000000000000006 /* WandovaTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		04ACF9D32F4E45E0004448FC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7E57E5700000000000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -157,7 +219,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7E57E5700000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		7E57E5700000000000000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 04ACF9D42F4E45E0004448FC /* Wandova */;
+			targetProxy = 7E57E5700000000000000007 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		04ACF9DE2F4E45E2004448FC /* Debug */ = {
@@ -353,6 +430,50 @@
 			};
 			name = Release;
 		};
+		7E57E5700000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LT76D3X9J2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.selineren.WandovaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wandova.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Wandova";
+			};
+			name = Debug;
+		};
+		7E57E570000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LT76D3X9J2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.selineren.WandovaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wandova.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Wandova";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -370,6 +491,15 @@
 			buildConfigurations = (
 				04ACF9E12F4E45E2004448FC /* Debug */,
 				04ACF9E22F4E45E2004448FC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7E57E570000000000000000B /* Build configuration list for PBXNativeTarget "WandovaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7E57E5700000000000000009 /* Debug */,
+				7E57E570000000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
