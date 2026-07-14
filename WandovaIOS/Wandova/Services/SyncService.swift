@@ -119,31 +119,16 @@ final class SyncService {
                 let cloudVisit = cloudById[countryId]
 
                 do {
-                    switch (localVisit, cloudVisit) {
-                    case let (local?, cloud?):
-                        // Both exist - use most recent
-                        if local.updatedAt > cloud.updatedAt {
-                            try await pushToCloud(local)
-                            syncedCount += 1
-                        } else if cloud.updatedAt > local.updatedAt {
-                            try saveToLocal(cloud)
-                            syncedCount += 1
-                        }
-                        // if equal, do nothing
-
-                    case let (local?, nil):
-                        // Only local - push to cloud
-                        try await pushToCloud(local)
-                    syncedCount += 1
-
-                case let (nil, cloud?):
-                    // Only cloud - save to local
-                    try saveToLocal(cloud)
-                    syncedCount += 1
-
-                case (nil, nil):
-                    break
-                }
+                    switch SyncResolver.merge(local: localVisit, remote: cloudVisit) {
+                    case .pushToCloud(let visit):
+                        try await pushToCloud(visit)
+                        syncedCount += 1
+                    case .saveToLocal(let visit):
+                        try saveToLocal(visit)
+                        syncedCount += 1
+                    case .noChange:
+                        break
+                    }
             } catch {
                 #if DEBUG
                 print("⚠️ Failed to sync country \(countryId): \(error)")
@@ -245,15 +230,8 @@ final class SyncService {
     }
 
     private func saveToLocal(_ visit: Visit) throws {
-        var merged = visit
         let existing = try? localRepository.visit(for: visit.countryId)
-        if let existing, !existing.photos.isEmpty {
-            // Prefer local photos; photo subcollection sync handles cross-device transfer
-            merged.photos = existing.photos
-        }
-        // If no existing local photos, preserve any photos decoded from the legacy "photos"
-        // field (old Firestore format) so the first sync on a new device migrates them.
-        try localRepository.upsert(merged)
+        try localRepository.upsert(SyncResolver.applyingLocalPhotos(from: existing, to: visit))
     }
 
     /// Deletes a single photo from the Firestore photos subcollection. Best-effort — errors are logged but not thrown.
