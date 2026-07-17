@@ -83,8 +83,6 @@ final class AppState: ObservableObject {
             let visitedIDs = Set(stored.filter { $0.isVisited }.map { $0.countryId })
             let wantToVisitIDs = Set(stored.filter { $0.wantToVisit }.map { $0.countryId })
             
-            // OPTIMIZATION: Batch update to trigger only one SwiftUI re-render
-            objectWillChange.send()
             self.visits = visitsDict
             self.visitedCountryIDs = visitedIDs
             self.wantToVisitCountryIDs = wantToVisitIDs
@@ -92,7 +90,6 @@ final class AppState: ObservableObject {
             #if DEBUG
             print("⚠️ Failed to load visits from SwiftData: \(error)")
             #endif
-            objectWillChange.send()
             self.visits = [:]
             self.visitedCountryIDs = []
             self.wantToVisitCountryIDs = []
@@ -232,11 +229,6 @@ final class AppState: ObservableObject {
         }
         v.updatedAt = Date()
 
-        // OPTIMIZATION: Batch updates to avoid multiple SwiftUI re-renders
-        // Use objectWillChange to manually trigger a single update
-        objectWillChange.send()
-        
-        // Update both properties without triggering individual notifications
         visits[countryId] = v
         if isVisited {
             visitedCountryIDs.insert(countryId)
@@ -257,7 +249,6 @@ final class AppState: ObservableObject {
             #endif
             
             // ROLLBACK: Restore old state to keep AppState consistent with DB
-            objectWillChange.send()
             if let old = oldVisit {
                 visits[countryId] = old
             } else {
@@ -287,9 +278,6 @@ final class AppState: ObservableObject {
         }
         v.updatedAt = Date()
         
-        // OPTIMIZATION: Batch updates to avoid multiple SwiftUI re-renders
-        objectWillChange.send()
-        
         // Update all related properties atomically
         visits[countryId] = v
         if wantToVisit {
@@ -311,7 +299,6 @@ final class AppState: ObservableObject {
             #endif
             
             // ROLLBACK: Restore old state to keep AppState consistent with DB
-            objectWillChange.send()
             if let old = oldVisit {
                 visits[countryId] = old
             } else {
@@ -330,8 +317,6 @@ final class AppState: ObservableObject {
         v.notes = notes
         v.updatedAt = Date()
         
-        // OPTIMIZATION: Manual notification to avoid triggering @Published twice
-        objectWillChange.send()
         visits[countryId] = v
 
         do {
@@ -351,8 +336,6 @@ final class AppState: ObservableObject {
         v.photos.append(photo)
         v.updatedAt = Date()
         
-        // OPTIMIZATION: Manual notification to avoid triggering @Published twice
-        objectWillChange.send()
         visits[countryId] = v
         
         do {
@@ -372,8 +355,6 @@ final class AppState: ObservableObject {
         v.photos.removeAll { $0.id == photoId }
         v.updatedAt = Date()
 
-        // OPTIMIZATION: Manual notification to avoid triggering @Published twice
-        objectWillChange.send()
         visits[countryId] = v
 
         do {
@@ -397,8 +378,6 @@ final class AppState: ObservableObject {
             v.photos[index].caption = caption
             v.updatedAt = Date()
             
-            // OPTIMIZATION: Manual notification to avoid triggering @Published twice
-            objectWillChange.send()
             visits[countryId] = v
             
             do {
@@ -423,8 +402,6 @@ final class AppState: ObservableObject {
     }
     
     func clearLocalState() {
-        // OPTIMIZATION: Batch update to trigger only one SwiftUI re-render
-        objectWillChange.send()
         visits = [:]
         visitedCountryIDs = []
         wantToVisitCountryIDs = []
