@@ -1,81 +1,38 @@
 # Wandova
 
-A SwiftUI iOS app for tracking the countries you've visited and the ones still on your list — with an interactive map, personal notes, stats, and cloud sync.
+**Track the world you've seen.** Wandova is an iOS app for logging the countries you've visited and the ones still on your list — an interactive world map, personal notes and photos per country, travel stats and achievements, and automatic cross-device sync that works offline-first.
 
-## Features
+<p align="center">
+  <img src="docs/screenshot.png" alt="Wandova map screen" width="300">
+</p>
 
-- **Interactive Map** — Visualize your visited and want-to-visit countries on a world map powered by MapKit
-- **Country Tracking** — Mark countries as visited or on your wishlist, add photos and personal notes
-- **Stats Dashboard** — See how many countries and continents you've covered and your world coverage percentage
-- **Achievements** — Unlock milestones as your travel footprint grows
-- **Travel Comparison** — Compare your visited countries with friends
-- **Map Export** — Export a snapshot of your travel map to share
-- **Search & Filter** — Find countries by name or browse by continent
-- **Cloud Sync** — Data syncs automatically across devices via Firestore
-- **Offline Support** — Full functionality without internet; changes sync when connectivity returns
-- **Sign in with Apple & Google** — Secure, fast authentication
+## Highlights
 
-## Tech Stack
+- **Interactive map** — visited and want-to-visit countries painted on a MapKit world map
+- **Memories** — photos and notes attached to each country
+- **Stats & achievements** — continents covered, world percentage, unlockable milestones
+- **Compare** — match your travel map against a friend's
+- **Offline-first sync** — every change lands on-device instantly and reconciles with the cloud when connectivity allows
 
-| Layer | Technology |
-|---|---|
-| UI | SwiftUI |
-| Map | MapKit |
-| Local storage | SwiftData |
-| Cloud storage | Firestore |
-| Authentication | Firebase Auth, Sign in with Apple, Google Sign-In |
-| Architecture | MVVM + Repository Pattern |
+## Stack
 
-## Architecture
+SwiftUI · SwiftData · Firestore · Combine · XCTest
 
-```
-SwiftUI Views
-    └── ViewModels (AppState)
-            └── Repository Layer
-                    ├── SwiftData (local)
-                    └── Firestore (cloud)
-                            └── SyncService (bi-directional sync)
-```
+MVVM with a repository layer; a pure conflict resolver handles cross-device sync (last-write-wins records, union-merged photos) and is covered by unit tests. The full design — including its known trade-offs — is in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
-- **AppState** — Central state management coordinating repositories and sync
-- **SyncService** — Handles bi-directional sync between local and cloud storage
-- **AuthService** — Manages Firebase authentication and sign-in providers
+## Try it
 
-## Getting Started
+📲 TestFlight / App Store link coming soon.
 
-### Prerequisites
-- Xcode 16.0 or later
-- iOS 17.6+ deployment target
-- A Firebase project with Authentication and Firestore enabled
+<details>
+<summary>Build from source</summary>
 
-### Setup
+1. Clone the repo and create a [Firebase](https://firebase.google.com) project with Authentication (Email, Google, Apple) and Firestore enabled.
+2. Add an iOS app with bundle ID `com.selineren.Wandova`, download `GoogleService-Info.plist`, and place it at `WandovaIOS/Wandova/GoogleService-Info.plist` (it's gitignored).
+3. `open WandovaIOS/Wandova.xcodeproj` and run on iOS 17.6+ with Xcode 16+. Tests: `Cmd+U`.
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/selineren/wandova-ios.git
-   cd wandova-ios
-   ```
-
-2. **Configure Firebase**
-   - Create a project at [firebase.google.com](https://firebase.google.com)
-   - Add an iOS app with bundle ID `com.selineren.Wandova`
-   - Download `GoogleService-Info.plist` and place it at `WandovaIOS/Wandova/GoogleService-Info.plist`
-   - Enable Email/Password, Google, and Apple sign-in methods in Firebase Console
-
-3. **Open in Xcode**
-   ```bash
-   open WandovaIOS/Wandova.xcodeproj
-   ```
-
-4. **Run**
-   Select a simulator or device and press `Cmd+R`
-
-### Notes
-
-- `GoogleService-Info.plist` is excluded from version control — you must add it manually
-- Country boundaries are loaded from a bundled GeoJSON file — no external API needed
-- Offline changes are queued locally and synced automatically when connectivity is restored
+</details>
 
 ---
 
-Built with SwiftUI · Designed for iOS 17.6+
+Built by [Selin Eren](https://github.com/selineren) · SwiftUI · iOS 17.6+
