@@ -120,6 +120,27 @@ final class AuthService: ObservableObject {
         user != nil
     }
 
+    /// The provider the current user originally signed in with.
+    /// Determines which re-authentication flow is required before sensitive
+    /// operations (e.g. account deletion), since password re-auth doesn't
+    /// apply to Google/Apple accounts that never set a password.
+    enum SignInProvider {
+        case password
+        case google
+        case apple
+        case unknown
+    }
+
+    var signInProvider: SignInProvider {
+        guard let providerID = user?.providerData.first?.providerID else { return .unknown }
+        switch providerID {
+        case EmailAuthProviderID: return .password
+        case GoogleAuthProviderID: return .google
+        case "apple.com": return .apple
+        default: return .unknown
+        }
+    }
+
     func signUp(email: String, password: String, firstName: String, lastName: String) async throws {
         let result = try await Auth.auth().createUser(withEmail: email, password: password)
 
@@ -255,6 +276,73 @@ final class AuthService: ObservableObject {
         try await user.reauthenticate(with: credential)
     }
 
+    /// Reauthenticate the current user via Google Sign-In
+    /// Required by Firebase before sensitive operations (e.g. account deletion)
+    /// for accounts that originally signed in with Google
+    func reauthenticateWithGoogle() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw NSError(
+                domain: "AuthService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "No user is currently signed in"]
+            )
+        }
+
+        guard let rootVC = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first(where: { $0.isKeyWindow })?.rootViewController else {
+            throw SocialAuthError.presentationError
+        }
+
+        let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootVC)
+        guard let idToken = result.user.idToken?.tokenString else {
+            throw SocialAuthError.missingToken
+        }
+
+        let credential = GoogleAuthProvider.credential(
+            withIDToken: idToken,
+            accessToken: result.user.accessToken.tokenString
+        )
+        try await user.reauthenticate(with: credential)
+    }
+
+    /// Reauthenticate the current user via Sign in with Apple
+    /// Required by Firebase before sensitive operations (e.g. account deletion)
+    /// for accounts that originally signed in with Apple
+    func reauthenticateWithApple() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw NSError(
+                domain: "AuthService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "No user is currently signed in"]
+            )
+        }
+
+        let nonce = randomNonceString()
+        currentNonce = nonce
+
+        let provider = ASAuthorizationAppleIDProvider()
+        let request = provider.createRequest()
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = sha256(nonce)
+
+        let authorization = try await appleCoordinator.signIn(with: request)
+
+        guard let appleCredential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let tokenData = appleCredential.identityToken,
+              let idToken = String(data: tokenData, encoding: .utf8) else {
+            throw SocialAuthError.missingToken
+        }
+
+        let credential = OAuthProvider.appleCredential(
+            withIDToken: idToken,
+            rawNonce: nonce,
+            fullName: appleCredential.fullName
+        )
+        try await user.reauthenticate(with: credential)
+    }
+
     /// Update the current user's password to a new value
     /// Note: User must be recently authenticated (call reauthenticate first)
     func updatePassword(newPassword: String) async throws {
@@ -273,19 +361,42 @@ final class AuthService: ObservableObject {
     /// This is a destructive operation that cannot be undone
     ///
     /// The deletion process follows these steps:
-    /// 1. Reauthenticate the user with their current password (required by Firebase)
+    /// 1. Reauthenticate the user via whichever provider they originally signed in
+    ///    with (required by Firebase). Password accounts reauth with `currentPassword`;
+    ///    Google/Apple accounts reauth via their respective sign-in flow.
     /// 2. Delete all visit documents from Firestore
     /// 3. Delete the Firebase Authentication account
     ///
-    /// - Parameter currentPassword: The user's current password for reauthentication
+    /// - Parameter currentPassword: The user's current password, required only when
+    ///   `signInProvider` is `.password`. Ignored for Google/Apple accounts.
     /// - Throws: Authentication errors, network errors, or Firestore errors
     /// - Note: If any step fails, the process stops and throws an error. The auth state listener
     ///         will automatically trigger sign-out cleanup if the account is successfully deleted.
-    func deleteAccount(currentPassword: String) async throws {
-        // Step 1: Reauthenticate user (required by Firebase for account deletion)
-        // This ensures the user is who they claim to be and refreshes their session token
-        try await reauthenticate(currentPassword: currentPassword)
-        
+    func deleteAccount(currentPassword: String? = nil) async throws {
+        // Step 1: Reauthenticate user (required by Firebase for account deletion),
+        // using whichever provider the account was created with.
+        switch signInProvider {
+        case .password:
+            guard let currentPassword, !currentPassword.isEmpty else {
+                throw NSError(
+                    domain: "AuthService",
+                    code: -4,
+                    userInfo: [NSLocalizedDescriptionKey: "Password is required to delete this account"]
+                )
+            }
+            try await reauthenticate(currentPassword: currentPassword)
+        case .google:
+            try await reauthenticateWithGoogle()
+        case .apple:
+            try await reauthenticateWithApple()
+        case .unknown:
+            throw NSError(
+                domain: "AuthService",
+                code: -5,
+                userInfo: [NSLocalizedDescriptionKey: "Unable to verify your sign-in method. Please sign out and sign back in, then try again."]
+            )
+        }
+
         // Step 2: Delete all Firestore visit documents for this user
         // Do this before deleting the auth account so we still have valid credentials
         let firestoreRepository = FirestoreVisitRepository()

@@ -19,10 +19,14 @@ struct DeleteAccountView: View {
 
     // MARK: - Validation
 
+    private var provider: AuthService.SignInProvider { authService.signInProvider }
+
     private var isFormValid: Bool {
-        !password.isEmpty &&
-        confirmationText == "DELETE" &&
-        !isDeleting
+        guard confirmationValid, !isDeleting else { return false }
+        if provider == .password {
+            return !password.isEmpty
+        }
+        return true
     }
 
     private var confirmationValid: Bool { confirmationText == "DELETE" }
@@ -109,38 +113,41 @@ struct DeleteAccountView: View {
                             .tracking(0.8)
                             .padding(.horizontal, 4)
 
-                        HStack(spacing: 12) {
-                            Group {
-                                if showPassword {
-                                    TextField("Password", text: $password)
-                                } else {
-                                    SecureField("Password", text: $password)
-                                }
-                            }
-                            .font(.system(size: 15))
-                            .foregroundStyle(Color.appInk)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-
-                            Button {
-                                showPassword.toggle()
-                            } label: {
-                                Image(systemName: showPassword ? "eye.fill" : "eye.slash.fill")
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(showPassword ? Color.appInk2 : Color.appInk3)
-                            }
-                            .buttonStyle(.plain)
+                        switch provider {
+                        case .password:
+                            passwordField
+                            Text("Enter your password to continue")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.appInk3)
+                                .padding(.horizontal, 4)
+                        case .google:
+                            providerNotice(
+                                icon: { AnyView(GoogleLogoView()) },
+                                text: "You'll be asked to confirm with Google before your account is deleted."
+                            )
+                        case .apple:
+                            providerNotice(
+                                icon: {
+                                    AnyView(
+                                        Image(systemName: "apple.logo")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundStyle(Color.appInk)
+                                    )
+                                },
+                                text: "You'll be asked to confirm with Apple before your account is deleted."
+                            )
+                        case .unknown:
+                            providerNotice(
+                                icon: {
+                                    AnyView(
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(.system(size: 16))
+                                            .foregroundStyle(Color.appGold)
+                                    )
+                                },
+                                text: "We couldn't verify your sign-in method. Please sign out and back in, then try again."
+                            )
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 16)
-                        .background(Color.appCard)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
-
-                        Text("Enter your password to continue")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.appInk3)
-                            .padding(.horizontal, 4)
                     }
 
                     // MARK: Confirm deletion
@@ -225,6 +232,55 @@ struct DeleteAccountView: View {
         .background(Color.appPaper)
     }
 
+    // MARK: - Password Field
+
+    private var passwordField: some View {
+        HStack(spacing: 12) {
+            Group {
+                if showPassword {
+                    TextField("Password", text: $password)
+                } else {
+                    SecureField("Password", text: $password)
+                }
+            }
+            .font(.system(size: 15))
+            .foregroundStyle(Color.appInk)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+
+            Button {
+                showPassword.toggle()
+            } label: {
+                Image(systemName: showPassword ? "eye.fill" : "eye.slash.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(showPassword ? Color.appInk2 : Color.appInk3)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        .background(Color.appCard)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
+    }
+
+    // MARK: - Provider Notice
+
+    private func providerNotice(icon: () -> AnyView, text: String) -> some View {
+        HStack(spacing: 12) {
+            icon()
+            Text(text)
+                .font(.system(size: 13))
+                .foregroundStyle(Color.appInk2)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        .background(Color.appCard)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
+    }
+
     // MARK: - Warning Row
 
     private func warningRow(icon: String, iconColor: Color, iconBg: Color, text: String) -> some View {
@@ -252,7 +308,7 @@ struct DeleteAccountView: View {
         defer { isDeleting = false }
 
         do {
-            try await authService.deleteAccount(currentPassword: password)
+            try await authService.deleteAccount(currentPassword: provider == .password ? password : nil)
             dismiss()
         } catch let error as NSError {
             errorMessage = friendlyErrorMessage(from: error)
@@ -302,6 +358,8 @@ struct DeleteAccountView: View {
             let message = error.localizedDescription.lowercased()
             if message.contains("network") || message.contains("internet") || message.contains("connection") {
                 return "Network error. Please check your connection and try again"
+            } else if message.contains("cancel") {
+                return "Sign-in was cancelled. Please try again to delete your account"
             } else {
                 return error.localizedDescription
             }

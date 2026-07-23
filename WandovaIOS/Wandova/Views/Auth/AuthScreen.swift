@@ -382,7 +382,7 @@ struct AuthScreen: View {
 
 // MARK: - Google Logo View
 
-private struct GoogleLogoView: View {
+struct GoogleLogoView: View {
     var body: some View {
         ZStack {
             ForEach(Array(googleSegments.enumerated()), id: \.offset) { _, seg in
