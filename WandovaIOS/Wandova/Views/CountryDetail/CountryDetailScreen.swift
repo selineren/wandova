@@ -83,8 +83,11 @@ struct CountryDetailScreen: View {
                     .fontWeight(.semibold)
             }
         }
-        .onChange(of: selectedPhotoItem) { _, newValue in
-            Task { await loadPhoto(from: newValue) }
+        .task(id: selectedPhotoItem) {
+            // .task(id:) cancels the previous invocation when selectedPhotoItem
+            // changes, so rapid back-to-back picks can't compress overlapping
+            // images at once and compound peak memory usage.
+            await loadPhoto(from: selectedPhotoItem)
         }
         .fullScreenCover(item: $fullScreenPhoto) { photo in
             PhotoFullScreenView(photo: photo) {
@@ -417,7 +420,14 @@ struct CountryDetailScreen: View {
         guard let item else { return }
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else { return }
-            let photo = VisitPhoto(imageData: compressImage(data))
+            // Decoding, resizing, and JPEG-encoding a full-resolution photo is heavy
+            // enough to spike memory and risk a jetsam kill if left on the main actor,
+            // so it's pushed onto a detached task. compressImage is `nonisolated` so
+            // this actually runs off the main thread instead of hopping straight back.
+            let compressed = await Task.detached(priority: .userInitiated) {
+                Self.compressImage(data)
+            }.value
+            let photo = VisitPhoto(imageData: compressed)
             appState.addPhoto(country.id, photo: photo)
             selectedPhotoItem = nil
         } catch {
@@ -425,7 +435,10 @@ struct CountryDetailScreen: View {
         }
     }
 
-    private func compressImage(_ data: Data) -> Data {
+    // Future improvement: use ImageIO's CGImageSourceCreateThumbnailAtIndex to
+    // generate a downsampled thumbnail directly, instead of decoding the full-
+    // resolution image before resizing it away.
+    private nonisolated static func compressImage(_ data: Data) -> Data {
         guard var image = UIImage(data: data) else { return data }
         let maxSize = 300_000
         let maxDimension: CGFloat = 1200
