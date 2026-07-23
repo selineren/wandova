@@ -35,15 +35,33 @@ final class AuthService: ObservableObject {
     
     private var authStateHandle: AuthStateDidChangeListenerHandle?
 
+    /// Set once per install, right after the fresh-install sign-out below. Unlike the
+    /// Keychain (where Firebase persists the auth session), UserDefaults is wiped when
+    /// the app is deleted — so its absence is how we detect a fresh install.
+    private static let hasLaunchedBeforeKey = "com.wandova.hasLaunchedBefore"
+
     init() {
         // Always start with unknown state for consistent UX
         // This ensures LoadingView shows briefly on every cold launch
         authState = .unknown
-        
+
         #if DEBUG
         print("🔐 AuthService init: state = .unknown")
         #endif
-        
+
+        // Firebase's auth session lives in the Keychain, which iOS does NOT clear on
+        // uninstall. Without this, a fresh install silently inherits the previous
+        // install's signed-in session, mounting the map (and kicking off Firestore
+        // sync, network prompts included) before the user has ever authenticated on
+        // this install. Force a sign-out exactly once per install to prevent that.
+        if !UserDefaults.standard.bool(forKey: Self.hasLaunchedBeforeKey) {
+            try? Auth.auth().signOut()
+            UserDefaults.standard.set(true, forKey: Self.hasLaunchedBeforeKey)
+            #if DEBUG
+            print("🔐 Fresh install detected - cleared any leftover Keychain session")
+            #endif
+        }
+
         // Get current user synchronously
         user = Auth.auth().currentUser
         
