@@ -48,6 +48,11 @@ struct ComparisonView: View {
                 if lastUserId != currentUserId {
                     lastUserId = currentUserId
                     viewModel.resetToIdle()
+                } else if case .error = viewModel.state {
+                    // Otherwise a stale error (e.g. from the empty-input case above,
+                    // dismissed by switching tabs instead of tapping "Try Again") would
+                    // keep reappearing on every visit with no search field in sight.
+                    viewModel.resetToIdle()
                 }
             }
             .onChange(of: appState.visits) { _, newVisits in
@@ -98,6 +103,13 @@ struct ComparisonView: View {
                     .background(Color.appPaper2)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
 
+                    if let inputError = viewModel.inputError {
+                        Text(inputError)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 4)
+                    }
+
                     Button {
                         Task { await viewModel.searchUser(yourVisits: appState.visits) }
                     } label: {
@@ -109,8 +121,8 @@ struct ComparisonView: View {
                             .background(Color.appSurface)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
-                    .disabled(viewModel.emailToCompare.isEmpty)
-                    .opacity(viewModel.emailToCompare.isEmpty ? 0.5 : 1)
+                    .disabled(!viewModel.canSubmit)
+                    .opacity(viewModel.canSubmit ? 1 : 0.5)
                 }
                 .padding(16)
                 .background(Color.appCard)
@@ -535,8 +547,14 @@ final class ComparisonViewModel: ObservableObject {
 
     @Published var state: ViewState = .idle
     @Published var selectedMode: ComparisonMode = .visited
-    @Published var emailToCompare: String = ""
+    @Published var emailToCompare: String = "" {
+        didSet { inputError = nil }
+    }
+    @Published private(set) var inputError: String?
     @Published private(set) var comparedUserProfile: UserProfile?
+
+    /// Whether emailToCompare has real (non-whitespace) content to submit.
+    var canSubmit: Bool { !emailToCompare.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     @Published private(set) var visitedComparison: TravelComparisonResult
     @Published private(set) var wishlistComparison: TravelComparisonResult
@@ -561,6 +579,15 @@ final class ComparisonViewModel: ObservableObject {
     }
 
     func searchUser(yourVisits: [String: Visit]) async {
+        // Guards both the button (already disabled for empty input) and the
+        // keyboard's return-key submit, which bypasses that disabled state.
+        // Kept as an inline validation message rather than the .error state so
+        // a plain empty submission never takes over the whole search screen.
+        guard canSubmit else {
+            inputError = "Please enter an email address"
+            return
+        }
+        inputError = nil
         state = .loading
 
         let timeoutTask = Task {
