@@ -82,6 +82,7 @@ final class CountryBoundaryService {
             "ISO3166-1-Alpha-2",
             "iso_a2",
             "ISO_A2",
+            "ISO_A2_EH",
             "iso2",
             "ISO2"
         ]
@@ -92,12 +93,13 @@ final class CountryBoundaryService {
             }
         }
         
-        // Try 3-letter codes and convert to 2-letter
+        // Try 3-letter codes and convert to 2-letter.
+        // Never use the point-of-view columns (ADM0_A3_US, ADM0_A3_GB, ...) —
+        // they encode which country a given government considers a territory to
+        // belong to (e.g. Kosovo's ADM0_A3_GB is "SRB"), which merged Kosovo's
+        // polygon into Serbia's overlays.
         let threeLetterKeys = [
             "ADM0_A3",
-            "ADM0_A3_US",
-            "ADM0_A3_GB",
-            "ADM0_A3_UN",
             "ISO_A3",
             "iso_a3"
         ]
@@ -192,7 +194,7 @@ final class CountryBoundaryService {
             // Z
             "ZMB": "ZM", "ZWE": "ZW",
             // Special
-            "XKX": "XK"
+            "XKX": "XK", "KOS": "XK"  // Kosovo (Natural Earth uses ADM0_A3 "KOS")
         ]
         return mapping[iso3.uppercased()]
     }

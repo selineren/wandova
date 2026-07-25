@@ -123,45 +123,44 @@ final class CountryDataService {
         if let name = extractCountryName(from: dict) {
             let normalized = name.lowercased()
             
-            // Skip these - they're not countries or are disputed/uninhabited
+            // Skip these - they're not countries, or they're territories/disputed
+            // areas whose administering country already has its own feature.
+            // Remapping territories to the parent code (e.g. Dhekelia -> GB) is
+            // unsafe: they appear earlier in the file than the parent country,
+            // so dedup would keep the territory's name and continent for the code.
             let skipList = [
                 "bir tawil",
                 "patagonian ice",
                 "spratly",
                 "scarborough reef",
-                "brazilian island"
+                "brazilian island",
+                "akrotiri",
+                "dhekelia",
+                "guantanamo",
+                "ashmore",
+                "cartier",
+                "coral sea",
+                "clipperton",
+                "indian ocean territories"
             ]
-            
+
             for skip in skipList {
                 if normalized.contains(skip) {
                     return nil // Intentionally skip these
                 }
             }
-            
-            // Assign territories to their administering country
-            if normalized.contains("akrotiri") || normalized.contains("dhekelia") {
-                return "GB" // UK Sovereign Base Areas
-            }
-            if normalized.contains("guantanamo") {
-                return "US" // US Naval Base
-            }
-            if normalized.contains("ashmore") || normalized.contains("cartier") ||
-               normalized.contains("coral sea") {
-                return "AU" // Australian territories
-            }
-            if normalized.contains("clipperton") {
-                return "FR" // French territory
-            }
-            if normalized.contains("indian ocean territories") {
-                return "AU" // Australian Indian Ocean Territories
-            }
         }
         
         // Try various property names for country code
+        // Note: never use the point-of-view columns (ADM0_A3_US, ADM0_A3_GB, ...) —
+        // they encode which country a given government considers a territory to
+        // belong to, not the territory's own code (e.g. Kosovo's ADM0_A3_GB is
+        // "SRB", which made Kosovo claim Serbia's code).
         let possibleKeys = [
             "ISO3166-1-Alpha-2",
             "iso_a2",
             "ISO_A2",
+            "ISO_A2_EH",
             "iso2",
             "ISO2",
             "countryCode",
@@ -169,10 +168,6 @@ final class CountryDataService {
             "iso_code",
             "ISO_CODE",
             "ADM0_A3",
-            "ADM0_A3_US",
-            "ADM0_A3_GB", 
-            "ADM0_A3_UN",
-            "ADM0_A3_WB",
             "ISO_A3",
             "iso_a3",
             "ISO3"
@@ -286,7 +281,7 @@ final class CountryDataService {
             "ZMB": "ZM", "ZWE": "ZW",
             
             // Special territories
-            "XKX": "XK"  // Kosovo
+            "XKX": "XK", "KOS": "XK"  // Kosovo (Natural Earth uses ADM0_A3 "KOS")
         ]
         return mapping[iso3.uppercased()]
     }
