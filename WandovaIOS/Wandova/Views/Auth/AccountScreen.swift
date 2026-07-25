@@ -258,7 +258,7 @@ struct AccountScreen: View {
                         Text("\(visitedThisYear) Visited This Year")
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(Color.appInk)
-                        Text(visitedThisYear > 0 ? "Active traveler" : "Start your \(Calendar.current.component(.year, from: Date())) travels")
+                        Text(visitedThisYear > 0 ? "Active traveler" : "Start your \(String(Calendar.current.component(.year, from: Date()))) travels")
                             .font(.system(size: 13))
                             .foregroundStyle(Color.appInk3)
                     }
