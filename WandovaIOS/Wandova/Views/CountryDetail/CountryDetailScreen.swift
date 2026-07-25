@@ -232,7 +232,11 @@ struct CountryDetailScreen: View {
                         } label: {
                             Text("Edit")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color.appInk3)
+                                .foregroundStyle(Color(hex: "#4A90D9"))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color(hex: "#4A90D9").opacity(0.12))
+                                .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
                     }
