@@ -38,7 +38,8 @@ final class MapSnapshotService {
         let logo = UIImage(named: "AppLogo")
 
         return await Task.detached(priority: .userInitiated) { [effVisited, effWishlist, logo] in
-            let overlays = CountryBoundaryService.shared.getCountryOverlays()
+            // Simplified geometry — plenty for a world-scale export image.
+            let overlays = CountryBoundaryService.shared.getRenderOverlays()
             switch style {
             case .flat:
                 return Self.renderFlat(

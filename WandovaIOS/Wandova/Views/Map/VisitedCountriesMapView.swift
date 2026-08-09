@@ -69,7 +69,10 @@ struct VisitedCountriesMapView: View {
         heading: 0,
         pitch: 0
     ))
+    /// Full-resolution overlays — tap hit-testing only.
     @State private var overlaysByCountry: [String: [MKOverlay]] = [:]
+    /// Simplified overlays — everything that gets drawn.
+    @State private var renderOverlaysByCountry: [String: [MKOverlay]] = [:]
     @State private var polygonItems: [PolygonItem] = []
     @State private var currentCenter = CLLocationCoordinate2D(latitude: 20, longitude: 0)
     @State private var internalLatDelta: Double = 60
@@ -104,10 +107,12 @@ struct VisitedCountriesMapView: View {
             }
         }
         .task {
-            let raw = await Task.detached(priority: .userInitiated) {
-                CountryBoundaryService.shared.getCountryOverlays()
+            let (render, hitTest) = await Task.detached(priority: .userInitiated) {
+                (CountryBoundaryService.shared.getRenderOverlays(),
+                 CountryBoundaryService.shared.getCountryOverlays())
             }.value
-            overlaysByCountry = raw
+            renderOverlaysByCountry = render
+            overlaysByCountry = hitTest
             updatePolygonItems()
         }
         .onChange(of: visitedCountryIDs) { _, _ in updatePolygonItems() }
@@ -150,7 +155,7 @@ struct VisitedCountriesMapView: View {
         let activeCountries = visitedCountryIDs.union(wantToVisitCountryIDs)
         var items: [PolygonItem] = []
         for countryID in activeCountries {
-            guard let overlays = overlaysByCountry[countryID] else { continue }
+            guard let overlays = renderOverlaysByCountry[countryID] else { continue }
             var idx = 0
             for overlay in overlays {
                 if let polygon = overlay as? MKPolygon {
