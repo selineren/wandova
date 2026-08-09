@@ -10,110 +10,58 @@ import MapKit
 
 final class CountryDataService {
     static let shared = CountryDataService()
-    
-    // OPTIMIZATION: Cache loaded countries in memory to avoid repeated disk I/O and parsing
-    private var countriesCache: [Country]?
-    private let cacheLock = NSLock()
-    
+
     private init() {}
-    
-    /// Loads all countries from the GeoJSON file (cached after first load)
+
+    /// All countries, derived from the shared single decode of the
+    /// full-resolution GeoJSON (cached by WorldGeoJSONStore).
     func loadCountries() -> [Country] {
-        // Check cache first (thread-safe)
-        cacheLock.lock()
-        if let cached = countriesCache {
-            cacheLock.unlock()
-            return cached
-        }
-        cacheLock.unlock()
-        
-        // Load from disk if not cached
-        let loaded = loadCountriesFromDisk()
-        
-        // Store in cache
-        cacheLock.lock()
-        countriesCache = loaded
-        cacheLock.unlock()
-        
-        return loaded
+        WorldGeoJSONStore.shared.load().countries
     }
-    
-    /// Internal method that actually loads from disk
-    private func loadCountriesFromDisk() -> [Country] {
-        guard let url = Bundle.main.url(forResource: "world_countries", withExtension: "geojson") else {
-            print("⚠️ world_countries.geojson not found in bundle")
-            return []
+
+    /// Builds the Country list from decoded GeoJSON. Stateless; called by
+    /// WorldGeoJSONStore during the shared decode.
+    func buildCountries(from objects: [MKGeoJSONObject]) -> [Country] {
+        var countries: [Country] = []
+
+        for object in objects {
+            guard let feature = object as? MKGeoJSONFeature else { continue }
+
+            guard let properties = feature.properties,
+                  let jsonObject = try? JSONSerialization.jsonObject(with: properties),
+                  let dict = jsonObject as? [String: Any]
+            else { continue }
+
+            guard let countryCode = extractCountryCode(from: dict) else { continue }
+            guard let countryName = extractCountryName(from: dict) else { continue }
+
+            let continent = extractContinent(from: dict)
+            let centroid = calculateCentroid(from: feature.geometry)
+            let flagEmoji = getFlagEmoji(for: countryCode)
+
+            let country = Country(
+                id: countryCode,
+                name: countryName,
+                continent: continent,
+                flagEmoji: flagEmoji,
+                centroid: centroid
+            )
+
+            countries.append(country)
         }
-        
-        do {
-            let data = try Data(contentsOf: url)
-            let decoder = MKGeoJSONDecoder()
-            let objects = try decoder.decode(data)
-            
-            var countries: [Country] = []
-            var skippedCount = 0
-            var skippedReasons: [String: Int] = [:]
-            
-            for object in objects {
-                guard let feature = object as? MKGeoJSONFeature else {
-                    skippedCount += 1
-                    skippedReasons["Not a feature"] = (skippedReasons["Not a feature"] ?? 0) + 1
-                    continue
-                }
-                
-                guard let properties = feature.properties,
-                      let jsonObject = try? JSONSerialization.jsonObject(with: properties),
-                      let dict = jsonObject as? [String: Any]
-                else {
-                    skippedCount += 1
-                    skippedReasons["No properties"] = (skippedReasons["No properties"] ?? 0) + 1
-                    continue
-                }
-                
-                guard let countryCode = extractCountryCode(from: dict) else {
-                    skippedCount += 1
-                    skippedReasons["No country code"] = (skippedReasons["No country code"] ?? 0) + 1
-                    continue
-                }
-                
-                guard let countryName = extractCountryName(from: dict) else {
-                    skippedCount += 1
-                    skippedReasons["No country name"] = (skippedReasons["No country name"] ?? 0) + 1
-                    continue
-                }
-                
-                let continent = extractContinent(from: dict)
-                let centroid = calculateCentroid(from: feature.geometry)
-                let flagEmoji = getFlagEmoji(for: countryCode)
-                
-                let country = Country(
-                    id: countryCode,
-                    name: countryName,
-                    continent: continent,
-                    flagEmoji: flagEmoji,
-                    centroid: centroid
-                )
-                
-                countries.append(country)
+
+        // Check for duplicates and remove them
+        var seenCodes = Set<String>()
+        var uniqueCountries: [Country] = []
+
+        for country in countries {
+            if !seenCodes.contains(country.id) {
+                seenCodes.insert(country.id)
+                uniqueCountries.append(country)
             }
-            
-            // Check for duplicates and remove them
-            var seenCodes = Set<String>()
-            var uniqueCountries: [Country] = []
-            
-            for country in countries {
-                if !seenCodes.contains(country.id) {
-                    seenCodes.insert(country.id)
-                    uniqueCountries.append(country)
-                }
-            }
-            
-            return uniqueCountries.sorted { $0.name < $1.name }
-            
-        } catch {
-            print("❌ Failed to load countries from GeoJSON: \(error)")
-            return []
         }
+
+        return uniqueCountries.sorted { $0.name < $1.name }
     }
     
     // MARK: - Extraction Helpers
