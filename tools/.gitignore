@@ -1,2 +1,3 @@
 # Never commit JSON files here (Admin SDK keys, service accounts, etc.)
 *.json
+node_modules/
