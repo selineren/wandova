@@ -360,6 +360,16 @@ final class FirestoreVisitRepository: RemoteVisitRepository {
             try await setData(photoDocument(photo), for: ref.document(photo.id.uuidString))
         }
 
+        for photo in merge.toUpdateCaption {
+            try await updateData(
+                [
+                    "caption": photo.caption,
+                    "captionUpdatedAt": Timestamp(date: photo.captionUpdatedAt)
+                ],
+                for: ref.document(photo.id.uuidString)
+            )
+        }
+
         return merge.merged
     }
 
@@ -382,6 +392,7 @@ final class FirestoreVisitRepository: RemoteVisitRepository {
         [
             "imageData": photo.imageData.base64EncodedString(),
             "caption": photo.caption,
+            "captionUpdatedAt": Timestamp(date: photo.captionUpdatedAt),
             "createdAt": Timestamp(date: photo.createdAt)
         ]
     }
@@ -394,7 +405,8 @@ final class FirestoreVisitRepository: RemoteVisitRepository {
             id: UUID(uuidString: doc.documentID) ?? UUID(),
             imageData: imageData,
             caption: data["caption"] as? String ?? "",
-            createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+            createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),
+            captionUpdatedAt: (data["captionUpdatedAt"] as? Timestamp)?.dateValue()
         )
     }
 }

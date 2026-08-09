@@ -53,6 +53,7 @@ final class MockCloudRepository: RemoteVisitRepository {
     private(set) var allVisitsCallCount = 0
     private(set) var setVisitCountryIds: [String] = []
     private(set) var uploadedPhotoIds: [UUID] = []
+    private(set) var captionUpdatedPhotoIds: [UUID] = []
     private(set) var deletedPhotoIds: [UUID] = []
 
     func allVisits() async throws -> [Visit] {
@@ -72,6 +73,13 @@ final class MockCloudRepository: RemoteVisitRepository {
         let merge = SyncResolver.mergePhotos(local: localPhotos, cloud: cloudPhotos[countryId] ?? [])
         cloudPhotos[countryId, default: []].append(contentsOf: merge.toUpload)
         uploadedPhotoIds.append(contentsOf: merge.toUpload.map(\.id))
+        for updated in merge.toUpdateCaption {
+            if let index = cloudPhotos[countryId]?.firstIndex(where: { $0.id == updated.id }) {
+                cloudPhotos[countryId]?[index].caption = updated.caption
+                cloudPhotos[countryId]?[index].captionUpdatedAt = updated.captionUpdatedAt
+            }
+        }
+        captionUpdatedPhotoIds.append(contentsOf: merge.toUpdateCaption.map(\.id))
         return merge.merged
     }
 

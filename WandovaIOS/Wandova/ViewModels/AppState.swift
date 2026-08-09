@@ -376,6 +376,7 @@ final class AppState: ObservableObject {
         var v = visit(for: countryId)
         if let index = v.photos.firstIndex(where: { $0.id == photoId }) {
             v.photos[index].caption = caption
+            v.photos[index].captionUpdatedAt = Date()
             v.updatedAt = Date()
             
             visits[countryId] = v

@@ -161,7 +161,7 @@ final class SyncService {
                     let mergedPhotos = try await cloudRepository.syncPhotos(
                         countryId: countryId, localPhotos: localPhotos
                     )
-                    if mergedPhotos.count != localPhotos.count,
+                    if mergedPhotos != localPhotos,
                        var localVisit = currentLocalById[countryId] {
                         localVisit.photos = mergedPhotos
                         try localRepository.upsert(localVisit)

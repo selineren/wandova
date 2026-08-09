@@ -133,6 +133,7 @@ final class SwiftDataVisitRepository: VisitRepository {
         var photos = decodePhotos(from: entity.photosData)
         if let index = photos.firstIndex(where: { $0.id == photoId }) {
             photos[index].caption = caption
+            photos[index].captionUpdatedAt = Date()
             entity.photosData = encodePhotos(photos)
             entity.updatedAt = Date()
             try context.save()

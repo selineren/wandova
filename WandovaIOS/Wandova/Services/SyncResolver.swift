@@ -49,21 +49,39 @@ enum SyncResolver {
     struct PhotoMerge: Equatable {
         /// Photos that exist only locally and must be written to the cloud.
         let toUpload: [VisitPhoto]
+        /// Photos on both sides whose local caption is newer — push the caption
+        /// (not the image) to the cloud.
+        let toUpdateCaption: [VisitPhoto]
         /// The union of both sides, keyed by photo ID: local photos first,
         /// then cloud-only photos.
         let merged: [VisitPhoto]
     }
 
     /// Union-merge by photo ID. A photo absent from the cloud uploads; a photo
-    /// absent locally comes down. Photos present on both sides are left alone —
-    /// the local copy wins in `merged`.
+    /// absent locally comes down. For photos on both sides the newer caption
+    /// wins (by captionUpdatedAt): a newer local caption is queued for cloud
+    /// update, a newer cloud caption is adopted into `merged`.
     static func mergePhotos(local: [VisitPhoto], cloud: [VisitPhoto]) -> PhotoMerge {
-        let cloudIds = Set(cloud.map { $0.id })
+        let cloudById = Dictionary(uniqueKeysWithValues: cloud.map { ($0.id, $0) })
         let localIds = Set(local.map { $0.id })
 
+        var toUpdateCaption: [VisitPhoto] = []
+        let localMerged = local.map { localPhoto -> VisitPhoto in
+            guard let cloudPhoto = cloudById[localPhoto.id] else { return localPhoto }
+            if localPhoto.captionUpdatedAt > cloudPhoto.captionUpdatedAt {
+                toUpdateCaption.append(localPhoto)
+                return localPhoto
+            }
+            var adopted = localPhoto
+            adopted.caption = cloudPhoto.caption
+            adopted.captionUpdatedAt = cloudPhoto.captionUpdatedAt
+            return adopted
+        }
+
         return PhotoMerge(
-            toUpload: local.filter { !cloudIds.contains($0.id) },
-            merged: local + cloud.filter { !localIds.contains($0.id) }
+            toUpload: local.filter { cloudById[$0.id] == nil },
+            toUpdateCaption: toUpdateCaption,
+            merged: localMerged + cloud.filter { !localIds.contains($0.id) }
         )
     }
 
