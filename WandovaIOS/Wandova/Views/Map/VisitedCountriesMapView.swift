@@ -36,19 +36,14 @@ extension MKCoordinateRegion {
     }
 }
 
-private extension MKPolygon {
-    var locationCoordinates: [CLLocationCoordinate2D] {
-        var coords = [CLLocationCoordinate2D](repeating: CLLocationCoordinate2D(), count: pointCount)
-        getCoordinates(&coords, range: NSRange(location: 0, length: pointCount))
-        return coords
-    }
-}
-
 // MARK: - Data Models
 
 private struct PolygonItem: Identifiable {
     let id: String
-    let coordinates: [CLLocationCoordinate2D]
+    /// Rendered as-is, so interiorPolygons (holes — e.g. Lesotho inside
+    /// South Africa) survive. Copying only the exterior ring, as the old
+    /// [CLLocationCoordinate2D] representation did, filled holes over.
+    let polygon: MKPolygon
     let countryID: String
 }
 
@@ -81,7 +76,7 @@ struct VisitedCountriesMapView: View {
         MapReader { proxy in
             Map(position: $cameraPosition) {
                 ForEach(polygonItems) { item in
-                    MapPolygon(coordinates: item.coordinates)
+                    MapPolygon(item.polygon)
                         .foregroundStyle(fillColor(for: item.countryID))
                         .stroke(strokeColor(for: item.countryID), lineWidth: lineWidth(for: item.countryID))
                 }
@@ -161,7 +156,7 @@ struct VisitedCountriesMapView: View {
                 if let polygon = overlay as? MKPolygon {
                     items.append(PolygonItem(
                         id: "\(countryID)_\(idx)",
-                        coordinates: polygon.locationCoordinates,
+                        polygon: polygon,
                         countryID: countryID
                     ))
                     idx += 1
@@ -169,7 +164,7 @@ struct VisitedCountriesMapView: View {
                     for subPolygon in multiPolygon.polygons {
                         items.append(PolygonItem(
                             id: "\(countryID)_\(idx)",
-                            coordinates: subPolygon.locationCoordinates,
+                            polygon: subPolygon,
                             countryID: countryID
                         ))
                         idx += 1
