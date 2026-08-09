@@ -101,7 +101,35 @@ final class SyncResolverPhotoMergeTests: XCTestCase {
         )
 
         XCTAssertEqual(result.toUpload, [localOnly], "only the local-only photo should upload")
+        XCTAssertTrue(result.toUpdateCaption.isEmpty, "identical captions need no update")
         XCTAssertEqual(result.merged, [localOnly, shared, cloudOnly], "union by ID, no duplicates")
+    }
+
+    // MARK: - Caption last-write-wins by edit time
+
+    func test_mergePhotos_newerLocalCaption_queuesCloudUpdate() {
+        let id = UUID()
+        let localEdit = makePhoto(id: id, caption: "edited here", captionUpdatedAt: date(2000))
+        let staleCloud = makePhoto(id: id, caption: "stale", captionUpdatedAt: date(1000))
+
+        let result = SyncResolver.mergePhotos(local: [localEdit], cloud: [staleCloud])
+
+        XCTAssertTrue(result.toUpload.isEmpty, "existing photo must not re-upload its image")
+        XCTAssertEqual(result.toUpdateCaption, [localEdit], "newer local caption pushes to cloud")
+        XCTAssertEqual(result.merged.first?.caption, "edited here")
+    }
+
+    func test_mergePhotos_newerCloudCaption_adoptedIntoMerged() {
+        let id = UUID()
+        let staleLocal = makePhoto(id: id, caption: "stale", captionUpdatedAt: date(1000))
+        let cloudEdit = makePhoto(id: id, caption: "edited elsewhere", captionUpdatedAt: date(2000))
+
+        let result = SyncResolver.mergePhotos(local: [staleLocal], cloud: [cloudEdit])
+
+        XCTAssertTrue(result.toUpload.isEmpty)
+        XCTAssertTrue(result.toUpdateCaption.isEmpty, "losing caption must not overwrite the cloud")
+        XCTAssertEqual(result.merged.first?.caption, "edited elsewhere")
+        XCTAssertEqual(result.merged.first?.captionUpdatedAt, date(2000))
     }
 }
 
@@ -130,6 +158,6 @@ func date(_ seconds: TimeInterval) -> Date {
     Date(timeIntervalSince1970: seconds)
 }
 
-func makePhoto(caption: String = "") -> VisitPhoto {
-    VisitPhoto(imageData: Data(caption.utf8), caption: caption, createdAt: date(0))
+func makePhoto(id: UUID = UUID(), caption: String = "", captionUpdatedAt: Date? = nil) -> VisitPhoto {
+    VisitPhoto(id: id, imageData: Data(caption.utf8), caption: caption, createdAt: date(0), captionUpdatedAt: captionUpdatedAt)
 }

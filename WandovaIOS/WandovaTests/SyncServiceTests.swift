@@ -84,6 +84,68 @@ final class SyncServiceTests: XCTestCase {
         XCTAssertEqual(cloud.cloudPhotos["TR"] ?? [], [], "deleted photo must stay deleted in the cloud")
     }
 
+    // MARK: - Caption sync
+
+    func test_sync_captionEdit_reachesCloud_andSurvivesNextSync() async throws {
+        let photoId = UUID()
+        let localEdited = makePhoto(id: photoId, caption: "edited on device", captionUpdatedAt: date(2000))
+        let staleCloud = makePhoto(id: photoId, caption: "stale cloud caption", captionUpdatedAt: date(1000))
+        local.visits["TR"] = makeVisit(photos: [localEdited], updatedAt: date(1000))
+        cloud.cloudVisits = [makeVisit(updatedAt: date(1000))]
+        cloud.cloudPhotos["TR"] = [staleCloud]
+
+        let service = makeService()
+        try await service.syncVisits(withRetry: false)
+
+        XCTAssertEqual(cloud.cloudPhotos["TR"]?.first?.caption, "edited on device", "caption must reach the cloud subcollection")
+        XCTAssertEqual(cloud.captionUpdatedPhotoIds, [photoId])
+        XCTAssertTrue(cloud.uploadedPhotoIds.isEmpty, "existing photo must not re-upload its image")
+
+        // The next sync must not revert or redundantly re-push the caption.
+        try await service.syncVisits(withRetry: false)
+
+        XCTAssertEqual(cloud.cloudPhotos["TR"]?.first?.caption, "edited on device", "caption must survive the next sync")
+        XCTAssertEqual(cloud.captionUpdatedPhotoIds, [photoId], "in-sync caption must not push again")
+        XCTAssertEqual(try local.visit(for: "TR").photos.first?.caption, "edited on device")
+    }
+
+    func test_sync_newerCloudCaption_isAdoptedAndPersistedLocally() async throws {
+        let photoId = UUID()
+        let staleLocal = makePhoto(id: photoId, caption: "stale local caption", captionUpdatedAt: date(1000))
+        let cloudEdited = makePhoto(id: photoId, caption: "edited on other device", captionUpdatedAt: date(2000))
+        local.visits["TR"] = makeVisit(photos: [staleLocal], updatedAt: date(1000))
+        cloud.cloudVisits = [makeVisit(updatedAt: date(1000))]
+        cloud.cloudPhotos["TR"] = [cloudEdited]
+
+        try await makeService().syncVisits(withRetry: false)
+
+        XCTAssertEqual(
+            try local.visit(for: "TR").photos.first?.caption,
+            "edited on other device",
+            "the newer cloud caption must be adopted and persisted locally"
+        )
+        XCTAssertTrue(cloud.captionUpdatedPhotoIds.isEmpty, "losing caption must not overwrite the cloud")
+    }
+
+    // MARK: - Sync of ordinary metadata documents
+
+    func test_sync_normalVisitsWithoutPhotoData_behavesUnchanged() async throws {
+        // Plain metadata on both sides, no photos anywhere: newer cloud wins,
+        // nothing photo-related happens.
+        local.visits["TR"] = makeVisit(notes: "old local", updatedAt: date(1000))
+        cloud.cloudVisits = [makeVisit(notes: "newer cloud", updatedAt: date(2000))]
+
+        try await makeService().syncVisits(withRetry: false)
+
+        let saved = try local.visit(for: "TR")
+        XCTAssertEqual(saved.notes, "newer cloud")
+        XCTAssertEqual(saved.updatedAt, date(2000))
+        XCTAssertEqual(saved.photos, [])
+        XCTAssertTrue(cloud.uploadedPhotoIds.isEmpty)
+        XCTAssertTrue(cloud.captionUpdatedPhotoIds.isEmpty)
+        XCTAssertTrue(cloud.deletedPhotoIds.isEmpty)
+    }
+
     // MARK: - Per-country failures
 
     func test_sync_countryFailure_continuesWithOthers_andSurfacesPartialFailure() async throws {
