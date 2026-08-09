@@ -80,3 +80,8 @@ build/
 # Env files
 .env
 .env.*
+
+# Secret keys & local settings — never commit these
+*firebase-adminsdk*.json
+*service-account*.json
+.claude/settings.local.json
