@@ -1,15 +1,20 @@
 ---
 name: map-polygon-freeze-v11
-description: Known map polygon freeze (VectorKit overlay invalidation) targeted for v1.1 — not a sync regression
+description: Map polygon freeze (VectorKit overlay invalidation) — fixed in 1.0.2 via bundled simplified borders + cached polygon items; keep concurrency out of the map path
 metadata:
   type: project
 ---
 
-Wandova has a known on-device freeze (confirmed 2026-08-09 during 1.0.1 testing): ~141% CPU, ~889 MB memory, zero disk/network. Paused stacks show VectorKit `md::OverlayLayerDataSource::invalidate` / `_updateNonTileOverlays`. Root cause is the map rendering path, planned for the v1.1 list:
+Wandova had an on-device freeze (confirmed 2026-08-09 during 1.0.1 testing): ~140% CPU, up to ~1.11 GB memory, zero disk/network. Paused stacks showed VectorKit `md::OverlayLayerDataSource::invalidate` / `_updateNonTileOverlays`. Root cause was the map rendering path: 13 MB of full-resolution Natural Earth polygons (~548K vertices; Canada 68K) rendered as SwiftUI `MapPolygon` on `.hybrid(elevation: .realistic)`, fully rebuilt and re-diffed on every country toggle AND every camera settle.
 
-- `world_countries.geojson` is 13 MB of full-resolution Natural Earth polygons.
-- `VisitedCountriesMapView.updatePolygonItems()` copies every coordinate of every selected country into fresh arrays and rebuilds on each state change; SwiftUI `MapPolygon` diffs thousand-vertex polygons on `.hybrid(elevation: .realistic)`.
+**Fixed in 1.0.2** (branch perf/v1.0.2-map-performance, 2026-08-09) by reducing work, deliberately touching no concurrency:
 
-Ruled out as causes (verified 2026-08-09): the 1.0.1 sync changes — mergePhotos caption LWW, the by-value `mergedPhotos != localPhotos` comparison (memcmps imageData but never decodes; bounded, once per country per sync), and VisitDocumentMapper (strictly less work than 1.0). The freeze path is identical in the 1.0 App Store build (commit 2167967, build 3).
+- `tools/simplify-borders.sh` (mapshaper, shared-arc Visvalingam, `interval=5000`, `keep-shapes`) generates bundled `world_countries_simplified.geojson` (~44K vertices, 1 MB). Rendering reads it; tap hit-testing keeps the full-resolution file.
+- `CountryPolygonItemBuilder` caches per-country render items once at load (MKPolygon references incl. `interiorPolygons` — this also fixed holes: Lesotho used to be painted over); toggles concat over a **sorted** country list (Set iteration order previously caused nondeterministic ForEach order).
+- Camera settles no longer invalidate any body: exact latDelta lives in non-observed class boxes (`CameraTracker`, `LatDeltaBox`); only threshold flags (`MapZoomUIState`) are @State; zoom buttons send `MapZoomCommand` (fresh UUID identity) instead of a shared latDelta binding.
+- `WorldGeoJSONStore` decodes the full-res file once for both CountryBoundaryService and CountryDataService.
+- Guarded by `SimplifiedBoundariesTests` / `CountryPolygonItemBuilderTests` / `WorldGeoJSONStoreTests` / `MapZoomStateTests`.
 
-Likely fixes to explore in v1.1: simplified/decimated polygon geometry, caching PolygonItems, or MKMapView+MKPolygonRenderer instead of SwiftUI MapPolygon.
+**History lesson (verified 2026-08-09):** the recollection of "three reverted map fixes" is wrong — no revert commits, no closed-unmerged PRs exist. What exists: four MKMapView-era optimization attempts (PRs #67, #80, #89, #91), each patching the previous one's race (async-load first-tap race → sync-fallback double-add → cross-thread renderer cache → stale diff-based annotations), all wiped by the SwiftUI globe migration (PR #172). The standing rule: reduce the map's work; do not add threading to make redundant work safe. `ComparisonMapView` intentionally stays on full-res overlays (single set used for both rendering and taps inside MKMapView renderer callbacks — the old race territory).
+
+Ruled out as causes (verified 2026-08-09): the 1.0.1 sync changes — mergePhotos caption LWW, the by-value photo comparison, and VisitDocumentMapper. The freeze path was identical in the 1.0 App Store build (commit 2167967, build 3).
