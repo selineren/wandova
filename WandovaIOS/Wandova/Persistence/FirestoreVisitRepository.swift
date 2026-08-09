@@ -115,78 +115,6 @@ final class FirestoreVisitRepository: RemoteVisitRepository {
         try await updateData(data, for: ref)
     }
     
-    func addPhoto(_ countryId: String, photo: VisitPhoto) async throws {
-        let userID = try requireUserID()
-        let ref = db.collection("users")
-            .document(userID)
-            .collection("visits")
-            .document(countryId)
-        
-        // Fetch current visit to get existing photos
-        let visit = try await self.visit(for: countryId)
-        var photos = visit.photos
-        photos.append(photo)
-        
-        // Encode photos as Base64 string for Firestore
-        let photosBase64 = try encodePhotosToBase64(photos)
-        
-        let data: [String: Any] = [
-            "photos": photosBase64,
-            "updatedAt": Timestamp(date: Date())
-        ]
-        
-        try await updateData(data, for: ref)
-    }
-    
-    func removePhoto(_ countryId: String, photoId: UUID) async throws {
-        let userID = try requireUserID()
-        let ref = db.collection("users")
-            .document(userID)
-            .collection("visits")
-            .document(countryId)
-        
-        // Fetch current visit to get existing photos
-        let visit = try await self.visit(for: countryId)
-        var photos = visit.photos
-        photos.removeAll { $0.id == photoId }
-        
-        // Encode photos as Base64 string for Firestore
-        let photosBase64 = try encodePhotosToBase64(photos)
-        
-        let data: [String: Any] = [
-            "photos": photosBase64,
-            "updatedAt": Timestamp(date: Date())
-        ]
-        
-        try await updateData(data, for: ref)
-    }
-    
-    func updatePhotoCaption(_ countryId: String, photoId: UUID, caption: String) async throws {
-        let userID = try requireUserID()
-        let ref = db.collection("users")
-            .document(userID)
-            .collection("visits")
-            .document(countryId)
-        
-        // Fetch current visit to get existing photos
-        let visit = try await self.visit(for: countryId)
-        var photos = visit.photos
-        
-        if let index = photos.firstIndex(where: { $0.id == photoId }) {
-            photos[index].caption = caption
-            
-            // Encode photos as Base64 string for Firestore
-            let photosBase64 = try encodePhotosToBase64(photos)
-            
-            let data: [String: Any] = [
-                "photos": photosBase64,
-                "updatedAt": Timestamp(date: Date())
-            ]
-            
-            try await updateData(data, for: ref)
-        }
-    }
-
     func deleteVisit(_ countryId: String) async throws {
         let userID = try requireUserID()
 
@@ -288,15 +216,6 @@ final class FirestoreVisitRepository: RemoteVisitRepository {
             throw FirestoreVisitRepositoryError.invalidData
         }
         
-        // Decode photos from Base64-encoded JSON array
-        let photos: [VisitPhoto]
-        if let photosBase64 = data["photos"] as? String,
-           let photosData = Data(base64Encoded: photosBase64) {
-            photos = (try? JSONDecoder().decode([VisitPhoto].self, from: photosData)) ?? []
-        } else {
-            photos = []
-        }
-        
         // Ensure visited countries have a date - if missing, use updatedAt as best guess
         let finalVisitedDate: Date?
         if validatedIsVisited {
@@ -305,13 +224,15 @@ final class FirestoreVisitRepository: RemoteVisitRepository {
             finalVisitedDate = nil
         }
 
+        // Visit metadata documents never carry photo payloads — photos live in
+        // the photos subcollection and sync separately via syncPhotos.
         return Visit(
             countryId: countryId,
             isVisited: validatedIsVisited,
             wantToVisit: validatedWantToVisit,
             visitedDate: finalVisitedDate,
             notes: notes,
-            photos: photos,
+            photos: [],
             updatedAt: updatedAt
         )
     }
@@ -475,12 +396,5 @@ final class FirestoreVisitRepository: RemoteVisitRepository {
             caption: data["caption"] as? String ?? "",
             createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
         )
-    }
-
-    // MARK: - Photo encoding (legacy: used by addPhoto/removePhoto/updatePhotoCaption)
-
-    private func encodePhotosToBase64(_ photos: [VisitPhoto]) throws -> String {
-        let jsonData = try JSONEncoder().encode(photos)
-        return jsonData.base64EncodedString()
     }
 }

@@ -67,15 +67,12 @@ enum SyncResolver {
         )
     }
 
-    /// When a cloud visit overwrites local, prefer the existing local photos;
-    /// the photo subcollection sync handles cross-device transfer. If there are
-    /// no existing local photos, keep any photos decoded from the legacy "photos"
-    /// field (old Firestore format) so the first sync on a new device migrates them.
+    /// When a cloud visit overwrites local, keep the existing local photos;
+    /// cloud metadata documents never carry photo payloads, and the photo
+    /// subcollection sync handles cross-device transfer.
     static func applyingLocalPhotos(from existing: Visit?, to remote: Visit) -> Visit {
         var merged = remote
-        if let existing, !existing.photos.isEmpty {
-            merged.photos = existing.photos
-        }
+        merged.photos = existing?.photos ?? []
         return merged
     }
 }

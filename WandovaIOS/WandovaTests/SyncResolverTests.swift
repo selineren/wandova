@@ -74,19 +74,15 @@ final class SyncResolverTests: XCTestCase {
         XCTAssertEqual(merged.updatedAt, date(2000))
     }
 
-    func test_applyingLocalPhotos_noLocalPhotos_keepsLegacyCloudPhotos() {
-        let legacyCloudPhoto = makePhoto(caption: "legacy firestore field")
+    func test_applyingLocalPhotos_noLocalPhotos_resultHasNoPhotos() {
+        // Cloud metadata documents never carry photo payloads; any photos on the
+        // remote value are dropped rather than treated as data to migrate.
+        let strayRemotePhoto = makePhoto(caption: "should not survive")
         let existing = makeVisit(photos: [], updatedAt: date(1000))
-        let remote = makeVisit(photos: [legacyCloudPhoto], updatedAt: date(2000))
+        let remote = makeVisit(photos: [strayRemotePhoto], updatedAt: date(2000))
 
-        XCTAssertEqual(
-            SyncResolver.applyingLocalPhotos(from: existing, to: remote).photos,
-            [legacyCloudPhoto]
-        )
-        XCTAssertEqual(
-            SyncResolver.applyingLocalPhotos(from: nil, to: remote).photos,
-            [legacyCloudPhoto]
-        )
+        XCTAssertEqual(SyncResolver.applyingLocalPhotos(from: existing, to: remote).photos, [])
+        XCTAssertEqual(SyncResolver.applyingLocalPhotos(from: nil, to: remote).photos, [])
     }
 }
 
