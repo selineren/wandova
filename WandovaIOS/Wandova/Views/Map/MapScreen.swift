@@ -19,7 +19,13 @@ struct MapScreen: View {
     @State private var showSyncStatus = true
     @State private var selectedCountryForSheet: SelectedCountry?
     @State private var selectedCountryForDetail: Country?
-    @State private var currentLatDelta: Double = 60
+    // Camera zoom is split into three pieces so that map camera settles
+    // don't re-evaluate this body (which would re-diff all map content):
+    // the exact latDelta lives in a non-invalidating box, only discrete
+    // UI-relevant flags are @State, and zoom buttons send explicit commands.
+    @State private var cameraLatDelta = LatDeltaBox(60)
+    @State private var zoomUI = MapZoomUIState(latDelta: 60)
+    @State private var zoomCommand: MapZoomCommand?
     @State private var showingMapUI = true
     @State private var filterMode: FilterMode = .all
     @State private var totalCountries: Int = 0
@@ -60,13 +66,17 @@ struct MapScreen: View {
                 MapContainerView(
                     visitedCountryIDs: filteredVisitedCountryIDs,
                     wantToVisitCountryIDs: filteredWantToVisitCountryIDs,
-                    latDelta: $currentLatDelta,
+                    zoomCommand: zoomCommand,
                     bitmojiAnnotations: getBitmojiAnnotations(),
                     onCountryTapped: { countryID in
                         handleCountryTap(countryID: countryID)
                     },
                     onBitmojiTapped: nil,
-                    onLatDeltaChanged: { currentLatDelta = $0 }
+                    onLatDeltaChanged: { delta in
+                        cameraLatDelta.value = delta
+                        let ui = MapZoomUIState(latDelta: delta)
+                        if ui != zoomUI { zoomUI = ui }
+                    }
                 )
                 .ignoresSafeArea()
 
@@ -230,21 +240,27 @@ struct MapScreen: View {
         .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 3)
     }
 
-    private var canZoomIn: Bool { currentLatDelta > 0.5 }
-    private var canZoomOut: Bool { currentLatDelta < 170 }
+    private var canZoomIn: Bool { zoomUI.canZoomIn }
+    private var canZoomOut: Bool { zoomUI.canZoomOut }
 
     private func zoomIn() {
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.prepare()
         generator.impactOccurred()
-        currentLatDelta = max(0.5, currentLatDelta / 2.0)
+        applyZoom(latDelta: max(0.5, cameraLatDelta.value / 2.0))
     }
 
     private func zoomOut() {
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.prepare()
         generator.impactOccurred()
-        currentLatDelta = min(180, currentLatDelta * 2.0)
+        applyZoom(latDelta: min(180, cameraLatDelta.value * 2.0))
+    }
+
+    private func applyZoom(latDelta: Double) {
+        cameraLatDelta.value = latDelta
+        zoomUI = MapZoomUIState(latDelta: latDelta)
+        zoomCommand = MapZoomCommand(latDelta: latDelta)
     }
 
     // MARK: - Filter Picker
@@ -555,7 +571,7 @@ struct MapScreen: View {
     }
 
     private func getBitmojiAnnotations() -> [CountryBitmojiAnnotation] {
-        guard currentLatDelta < 90 else { return [] }
+        guard zoomUI.showBitmojis else { return [] }
         guard filterMode == .all || filterMode == .visited else { return [] }
 
         let countries = CountryDataService.shared.loadCountries()
@@ -777,11 +793,37 @@ struct CountryQuickActionSheet: View {
     }
 }
 
+// MARK: - Camera Zoom State
+
+/// Exact camera latDelta, remembered without invalidating the view.
+/// A class held in @State: mutating `value` does not trigger a body
+/// re-evaluation, so camera settles stay free.
+final class LatDeltaBox {
+    var value: Double
+    init(_ value: Double) { self.value = value }
+}
+
+/// The discrete facts the MapScreen UI actually derives from the zoom
+/// level. @State updates only when one of these flips, so the body (and
+/// with it the map content) re-evaluates on threshold crossings instead
+/// of on every camera settle.
+struct MapZoomUIState: Equatable {
+    let showBitmojis: Bool
+    let canZoomIn: Bool
+    let canZoomOut: Bool
+
+    init(latDelta: Double) {
+        showBitmojis = latDelta < 90
+        canZoomIn = latDelta > 0.5
+        canZoomOut = latDelta < 170
+    }
+}
+
 // MARK: - Map Container (Optimization)
 struct MapContainerView: View {
     let visitedCountryIDs: Set<String>
     let wantToVisitCountryIDs: Set<String>
-    @Binding var latDelta: Double
+    let zoomCommand: MapZoomCommand?
     let bitmojiAnnotations: [CountryBitmojiAnnotation]
     let onCountryTapped: ((String) -> Void)?
     let onBitmojiTapped: ((String) -> Void)?
@@ -791,7 +833,7 @@ struct MapContainerView: View {
         VisitedCountriesMapView(
             visitedCountryIDs: visitedCountryIDs,
             wantToVisitCountryIDs: wantToVisitCountryIDs,
-            latDelta: $latDelta,
+            zoomCommand: zoomCommand,
             onCountryTapped: onCountryTapped,
             bitmojiAnnotations: bitmojiAnnotations,
             onBitmojiTapped: onBitmojiTapped,

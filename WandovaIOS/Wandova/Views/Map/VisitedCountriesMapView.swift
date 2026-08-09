@@ -36,15 +36,15 @@ extension MKCoordinateRegion {
     }
 }
 
-// MARK: - Data Models
+// MARK: - Camera Tracking
 
-private struct PolygonItem: Identifiable {
-    let id: String
-    /// Rendered as-is, so interiorPolygons (holes — e.g. Lesotho inside
-    /// South Africa) survive. Copying only the exterior ring, as the old
-    /// [CLLocationCoordinate2D] representation did, filled holes over.
-    let polygon: MKPolygon
-    let countryID: String
+/// Camera state the view needs to remember but must not re-render for.
+/// A plain class held in @State: mutating its properties does not
+/// invalidate the view, so camera settles no longer re-evaluate `body`
+/// (and therefore no longer re-diff the polygon content).
+private final class CameraTracker {
+    var center = CLLocationCoordinate2D(latitude: 20, longitude: 0)
+    var latDelta: Double = 60
 }
 
 // MARK: - Map View
@@ -52,7 +52,7 @@ private struct PolygonItem: Identifiable {
 struct VisitedCountriesMapView: View {
     let visitedCountryIDs: Set<String>
     let wantToVisitCountryIDs: Set<String>
-    @Binding var latDelta: Double
+    var zoomCommand: MapZoomCommand?
     var onCountryTapped: ((String) -> Void)?
     var bitmojiAnnotations: [CountryBitmojiAnnotation] = []
     var onBitmojiTapped: ((String) -> Void)?
@@ -66,11 +66,10 @@ struct VisitedCountriesMapView: View {
     ))
     /// Full-resolution overlays — tap hit-testing only.
     @State private var overlaysByCountry: [String: [MKOverlay]] = [:]
-    /// Simplified overlays — everything that gets drawn.
-    @State private var renderOverlaysByCountry: [String: [MKOverlay]] = [:]
-    @State private var polygonItems: [PolygonItem] = []
-    @State private var currentCenter = CLLocationCoordinate2D(latitude: 20, longitude: 0)
-    @State private var internalLatDelta: Double = 60
+    /// Simplified geometry pre-flattened into render items, built once at load.
+    @State private var polygonItemsByCountry: [String: [CountryPolygonItem]] = [:]
+    @State private var polygonItems: [CountryPolygonItem] = []
+    @State private var camera = CameraTracker()
 
     var body: some View {
         MapReader { proxy in
@@ -92,8 +91,8 @@ struct VisitedCountriesMapView: View {
             .mapStyle(.hybrid(elevation: .realistic))
             .onMapCameraChange(frequency: .onEnd) { context in
                 let actualDelta = context.region.span.latitudeDelta
-                currentCenter = context.camera.centerCoordinate
-                internalLatDelta = actualDelta
+                camera.center = context.camera.centerCoordinate
+                camera.latDelta = actualDelta
                 onLatDeltaChanged?(actualDelta)
             }
             .onTapGesture { location in
@@ -102,22 +101,21 @@ struct VisitedCountriesMapView: View {
             }
         }
         .task {
-            let (render, hitTest) = await Task.detached(priority: .userInitiated) {
-                (CountryBoundaryService.shared.getRenderOverlays(),
+            let (renderItems, hitTest) = await Task.detached(priority: .userInitiated) {
+                (CountryPolygonItemBuilder.itemsByCountry(from: CountryBoundaryService.shared.getRenderOverlays()),
                  CountryBoundaryService.shared.getCountryOverlays())
             }.value
-            renderOverlaysByCountry = render
+            polygonItemsByCountry = renderItems
             overlaysByCountry = hitTest
             updatePolygonItems()
         }
         .onChange(of: visitedCountryIDs) { _, _ in updatePolygonItems() }
         .onChange(of: wantToVisitCountryIDs) { _, _ in updatePolygonItems() }
-        .onChange(of: latDelta) { _, newVal in
-            guard abs(newVal - internalLatDelta) > 0.01 else { return }
-            internalLatDelta = newVal
+        .onChange(of: zoomCommand) { _, newVal in
+            guard let command = newVal else { return }
             cameraPosition = .region(MKCoordinateRegion(
-                center: currentCenter,
-                span: MKCoordinateSpan(latitudeDelta: newVal, longitudeDelta: newVal)
+                center: camera.center,
+                span: MKCoordinateSpan(latitudeDelta: command.latDelta, longitudeDelta: command.latDelta)
             ))
         }
     }
@@ -147,32 +145,10 @@ struct VisitedCountriesMapView: View {
     // MARK: - Overlay Management
 
     private func updatePolygonItems() {
-        let activeCountries = visitedCountryIDs.union(wantToVisitCountryIDs)
-        var items: [PolygonItem] = []
-        for countryID in activeCountries {
-            guard let overlays = renderOverlaysByCountry[countryID] else { continue }
-            var idx = 0
-            for overlay in overlays {
-                if let polygon = overlay as? MKPolygon {
-                    items.append(PolygonItem(
-                        id: "\(countryID)_\(idx)",
-                        polygon: polygon,
-                        countryID: countryID
-                    ))
-                    idx += 1
-                } else if let multiPolygon = overlay as? MKMultiPolygon {
-                    for subPolygon in multiPolygon.polygons {
-                        items.append(PolygonItem(
-                            id: "\(countryID)_\(idx)",
-                            polygon: subPolygon,
-                            countryID: countryID
-                        ))
-                        idx += 1
-                    }
-                }
-            }
-        }
-        polygonItems = items
+        polygonItems = CountryPolygonItemBuilder.items(
+            for: visitedCountryIDs.union(wantToVisitCountryIDs),
+            in: polygonItemsByCountry
+        )
     }
 
     // MARK: - Tap Handling
