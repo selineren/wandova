@@ -16,29 +16,31 @@ SwiftUI Views
 ```
 
 - **`AppState`** is the app-wide store: every screen reads visit data from it, and every mutation (mark visited, edit notes, add/remove photos) goes through it. It writes to the local repository first, then kicks off a fire-and-forget cloud sync.
-- **`SyncService`** orchestrates sync. It depends only on the `VisitRepository` / `RemoteVisitRepository` protocols, an injectable `NetworkMonitor`, and an injectable auth check — no concrete Firestore or SwiftData types — so it runs under test with mocks.
+- **`SyncService`** orchestrates sync. It depends only on the `VisitRepository` / `RemoteVisitRepository` protocols and an injectable auth check — no concrete Firestore or SwiftData types — so it runs under test with mocks.
 - **`SyncResolver`** holds the conflict-resolution *rules* as pure functions (values in, decisions out; no I/O). `SyncService` executes the decisions.
 
-State and reactivity use **Combine**: view models are `ObservableObject`s with `@Published` properties, and `AppState` subscribes to `NetworkMonitor.$isConnected` to re-trigger sync when connectivity returns.
+State and reactivity use **Combine**: view models are `ObservableObject`s with `@Published` properties, and `AppState` subscribes to `NetworkMonitor.$isConnected` to drive the offline UI indicator — nothing resyncs when connectivity returns mid-session. After an offline sync failure, recovery comes from the sync banner's Retry button, the next data mutation, or the automatic sync on sign-in, root/map view appearance, and return to foreground.
 
 ## Sync model
 
-The app is offline-first: all writes land in SwiftData immediately and the UI never waits on the network. Sync runs after each local mutation, at app start, after sign-in, and when connectivity is restored.
+The app is offline-first: all writes land in SwiftData immediately and the UI never waits on the network. Sync runs after each local mutation, at app start, after sign-in, and on return to foreground.
 
 **Visit records — last-write-wins per record.** Sync loads all local and all cloud visits, unions the country IDs, and resolves each country with `SyncResolver.merge`: whichever side has the newer `updatedAt` overwrites the other in full; a record that exists on only one side is copied to the other; equal timestamps are a no-op.
 
-**Photos — union-merge by ID.** Photos live in a per-country Firestore subcollection and are reconciled separately from the visit document: photos that exist only locally are uploaded, photos that exist only in the cloud are downloaded, and photos present on both sides are left alone. When a newer cloud record overwrites a local one, existing local photos are preserved rather than clobbered — cross-device photo transfer is the subcollection sync's job. Deleting a photo calls a best-effort cloud delete *before* the follow-up sync, so the union-merge doesn't resurrect it.
+**Photos — union-merge by ID.** Photos live in a per-country Firestore subcollection and are reconciled separately from the visit document: photos that exist only locally are uploaded, photos that exist only in the cloud are downloaded, and for photos on both sides the newer caption wins (by `captionUpdatedAt`); image data is never re-uploaded. When a newer cloud record overwrites a local one, existing local photos are preserved rather than clobbered — cross-device photo transfer is the subcollection sync's job. Deleting a photo calls a best-effort cloud delete *before* the follow-up sync, so the union-merge doesn't resurrect it.
 
 **Failure handling.** Sync retries up to 3 times with a 2-second delay; network and auth errors are not retried (retrying won't fix them — the user needs connectivity or a session). A failure on one country doesn't abort the rest: errors are counted and surfaced as a partial-failure status the UI can present, and offline changes simply sync on the next trigger.
 
 ## Tests
 
-`WandovaTests` (XCTest) covers the sync engine at two levels:
+`WandovaTests` (XCTest) — 42 tests across 8 suites. The sync engine is covered at two levels:
 
-- **`SyncResolverTests`** — the pure conflict rules: newer-side-wins in both directions, equal timestamps as no-op even when content differs, one-sided copies, photo union-merge, and local-photo preservation on cloud overwrite (including the legacy-format migration path).
-- **`SyncServiceTests`** — the orchestrator against in-memory mock repositories: end-to-end merge outcomes, deleted-photo non-resurrection, partial failure continuing past a bad country, retry counts, and that offline/auth errors short-circuit without retrying.
+- **`SyncResolverTests` / `SyncResolverPhotoMergeTests`** — the pure conflict rules: newer-side-wins in both directions, equal timestamps as no-op even when content differs, one-sided copies, photo union-merge, caption last-write-wins by `captionUpdatedAt`, and local-photo preservation on cloud overwrite (stray remote photo payloads are dropped, never migrated).
+- **`SyncServiceTests`** — the orchestrator against in-memory mock repositories: end-to-end merge outcomes, caption edits reaching the cloud and surviving the next sync, deleted-photo non-resurrection, partial failure continuing past a bad country, retry counts, and that offline/auth errors short-circuit without retrying.
 
 This split is deliberate: the rules are tested exhaustively as pure functions, and the service tests check that the orchestration honors them.
+
+Later suites cover Firestore document mapping and the map pipeline: **`VisitDocumentMapperTests`** (document decoding, required-field validation, metadata docs never returning photo payloads), **`WorldGeoJSONStoreTests`** (both GeoJSON products from one cached decode, services delegating to the shared store), **`SimplifiedBoundariesTests`** (simplified borders cover the same countries, stay substantially smaller, keep the Lesotho hole, and tap hit-testing stays full-resolution), and **`CountryPolygonItemBuilderTests`** / **`MapZoomStateTests`** (polygon item construction and zoom thresholds).
 
 ## Known trade-offs
 
